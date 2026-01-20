@@ -338,12 +338,10 @@ class ContrastiveTAPDataset(Dataset):
             perm = np.random.permutation(self.action_chunk)
             return positive_action[perm]
         else:
-            # Mirror x or y
+            # Mirror random action dimension (works for any action_dim)
             mirrored = positive_action.copy()
-            if np.random.rand() > 0.5:
-                mirrored[:, 0] = -mirrored[:, 0]  # Mirror x
-            else:
-                mirrored[:, 1] = -mirrored[:, 1]  # Mirror y
+            dim_to_negate = np.random.randint(positive_action.shape[1])
+            mirrored[:, dim_to_negate] = -mirrored[:, dim_to_negate]
             return mirrored
 
     def __getitem__(self, idx):

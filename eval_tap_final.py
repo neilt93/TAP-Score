@@ -1,14 +1,11 @@
 """
 Final TAP Evaluation - Bulletproof Metrics
 
-Fixes:
-1. Correct threshold direction (score < tau = failure)
-2. Proper TPR@FPR reporting
-3. M ablation for stability
-4. Clean baseline reporting
+Supports multiple benchmarks: pusht, lift, kitchen, blockpush
 
 Usage:
-    python eval_tap_final.py --checkpoint checkpoints_contrastive/contrastive_tap_best.pt
+    python eval_tap_final.py --benchmark pusht --checkpoint checkpoints_contrastive/pusht/best.pt
+    python eval_tap_final.py --benchmark lift --checkpoint checkpoints_contrastive/lift/best.pt
 """
 
 import argparse
@@ -17,11 +14,12 @@ from pathlib import Path
 
 import numpy as np
 import torch
-import zarr
 from tqdm import tqdm
 from sklearn.metrics import roc_auc_score, roc_curve
 
 from tap.contrastive import ContrastiveTAPScore
+from tap.benchmarks import get_benchmark_config, get_data_path, list_benchmarks
+from tap.data_loaders import load_episodes, print_data_stats
 
 
 M_NEGATIVES = 15
@@ -44,17 +42,6 @@ def load_model(checkpoint_path, device):
     return model, config
 
 
-def load_episodes(data_path):
-    root = zarr.open_group(str(data_path), mode='r')
-    images = root['data']['img'][:]
-    actions = root['data']['action'][:]
-    episode_ends = root['meta']['episode_ends'][:]
-    episode_starts = np.concatenate([[0], episode_ends[:-1]])
-    episodes = []
-    for i in range(len(episode_ends)):
-        start, end = episode_starts[i], episode_ends[i]
-        episodes.append({'images': images[start:end], 'actions': actions[start:end]})
-    return episodes
 
 
 def build_negative_pool(episodes, action_chunk, n_samples=2000):
@@ -188,16 +175,34 @@ def find_threshold_at_fpr(success_scores, target_fpr):
 
 def main():
     parser = argparse.ArgumentParser(description="Final TAP Evaluation")
-    parser.add_argument("--checkpoint", type=str, default="checkpoints_contrastive/contrastive_tap_best.pt")
-    parser.add_argument("--data_dir", type=str, default="data/processed/pusht")
+    parser.add_argument("--benchmark", type=str, default="pusht",
+                        choices=list_benchmarks(),
+                        help="Benchmark to evaluate on")
+    parser.add_argument("--checkpoint", type=str, default=None,
+                        help="Model checkpoint path (default: auto-resolve based on benchmark)")
+    parser.add_argument("--data_dir", type=str, default=None,
+                        help="Data directory (default: auto-resolve based on benchmark)")
     parser.add_argument("--output_dir", type=str, default="eval_results")
     parser.add_argument("--n_episodes", type=int, default=40)
     parser.add_argument("--device", type=str, default="cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
     args = parser.parse_args()
 
+    # Get benchmark config
+    benchmark_config = get_benchmark_config(args.benchmark)
+
+    # Auto-resolve paths
+    if args.checkpoint is None:
+        args.checkpoint = f"checkpoints_contrastive/{args.benchmark}/contrastive_tap_best.pt"
+    if args.data_dir is None:
+        args.data_dir = str(get_data_path(args.benchmark))
+
     print("=" * 70)
-    print("FINAL TAP EVALUATION")
+    print(f"FINAL TAP EVALUATION - {benchmark_config['name']}")
     print("=" * 70)
+    print(f"\nBenchmark:    {args.benchmark}")
+    print(f"Action dim:   {benchmark_config['action_dim']}")
+    print(f"Checkpoint:   {args.checkpoint}")
+    print(f"Data dir:     {args.data_dir}")
     print("\nTraining negatives: noise, permute, mirror, random")
     print("Held-out failures:  scaling, bias, stuck, delayed (NOT in training)")
     print("=" * 70)
@@ -209,7 +214,8 @@ def main():
     # Load
     print("\nLoading...")
     model, config = load_model(args.checkpoint, device)
-    episodes = load_episodes(args.data_dir)
+    episodes = load_episodes(args.data_dir, args.benchmark)
+    print_data_stats(episodes, args.benchmark)
     action_chunk = config.get("action_chunk", 16)
     negative_pool = build_negative_pool(episodes, action_chunk)
 
@@ -373,6 +379,8 @@ def main():
 
     # Save results
     results = {
+        'benchmark': args.benchmark,
+        'action_dim': benchmark_config['action_dim'],
         'tap_auroc': float(tap_auroc),
         'baseline_auroc': float(mag_auroc),
         'prefix_auroc': float(prefix_auroc) if 'prefix_auroc' in dir() else None,
@@ -383,9 +391,10 @@ def main():
         'separation': float(np.mean(success_tap) - np.mean(failure_tap)),
     }
 
-    with open(output_dir / "final_eval_results.json", "w") as f:
+    results_file = output_dir / f"{args.benchmark}_eval_results.json"
+    with open(results_file, "w") as f:
         json.dump(results, f, indent=2)
-    print(f"\nResults saved to {output_dir / 'final_eval_results.json'}")
+    print(f"\nResults saved to {results_file}")
 
 
 if __name__ == "__main__":

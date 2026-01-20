@@ -87,17 +87,45 @@
 
 ---
 
-## Reproduction (3 Commands)
+## Multi-Benchmark Support
+
+TAP-Score supports 4 benchmarks with different action dimensions:
+
+| Benchmark | Action Dim | Task |
+|-----------|------------|------|
+| `pusht` | 2 | Push T-block to target |
+| `lift` | 7 | Robomimic arm lifting |
+| `kitchen` | 9 | Kitchen manipulation |
+| `blockpush` | 2 | Block pushing |
+
+```bash
+# Download all benchmarks
+./scripts/download_benchmarks.sh all
+
+# Train on any benchmark
+python train_contrastive_tap.py --benchmark pusht
+python train_contrastive_tap.py --benchmark lift
+
+# Evaluate
+python eval_tap_final.py --benchmark pusht
+
+# Cross-benchmark comparison
+python scripts/eval_all_benchmarks.py
+```
+
+---
+
+## Reproduction (Push-T)
 
 ```bash
 # Train Contrastive TAP
-python train_contrastive_tap.py --data_dir data/processed/pusht
+python train_contrastive_tap.py --benchmark pusht
 
 # Evaluate with bulletproof metrics
-python eval_tap_final.py --checkpoint checkpoints_contrastive/contrastive_tap_best.pt
+python eval_tap_final.py --benchmark pusht
 
 # View results
-cat eval_results/final_eval_results.json
+cat eval_results/pusht_eval_results.json
 ```
 
 ---

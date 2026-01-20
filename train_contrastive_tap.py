@@ -4,8 +4,11 @@ Train Contrastive TAP-Score Model
 Ranking-based objective that fixes the BCE collapse problem.
 The model learns to rank the correct action above negatives.
 
+Supports multiple benchmarks: pusht, lift, kitchen, blockpush
+
 Usage:
-    python train_contrastive_tap.py --data_dir data/processed/pusht
+    python train_contrastive_tap.py --benchmark pusht
+    python train_contrastive_tap.py --benchmark lift
 """
 
 import argparse
@@ -19,6 +22,7 @@ from tap.contrastive import (
     build_contrastive_tap_model,
     create_contrastive_dataloaders,
 )
+from tap.benchmarks import get_benchmark_config, get_data_path, list_benchmarks
 
 
 def train_epoch(model, loader, optimizer, device):
@@ -62,7 +66,11 @@ def eval_epoch(model, loader, device):
 
 def main():
     parser = argparse.ArgumentParser(description="Train Contrastive TAP-Score")
-    parser.add_argument("--data_dir", type=str, default="data/processed/pusht")
+    parser.add_argument("--benchmark", type=str, default="pusht",
+                        choices=list_benchmarks(),
+                        help="Benchmark to train on")
+    parser.add_argument("--data_dir", type=str, default=None,
+                        help="Data directory (default: auto-resolve based on benchmark)")
     parser.add_argument("--output_dir", type=str, default="checkpoints_contrastive")
     parser.add_argument("--epochs", type=int, default=30)
     parser.add_argument("--batch_size", type=int, default=64)
@@ -76,18 +84,24 @@ def main():
     parser.add_argument("--device", type=str, default="cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
     args = parser.parse_args()
 
+    # Get benchmark config and auto-resolve data path
+    benchmark_config = get_benchmark_config(args.benchmark)
+    if args.data_dir is None:
+        args.data_dir = str(get_data_path(args.benchmark))
+
     print("=" * 60)
-    print("Contrastive TAP-Score Training")
+    print(f"Contrastive TAP-Score Training - {benchmark_config['name']}")
     print("=" * 60)
-    print("Key difference: ranking objective (InfoNCE) instead of BCE")
-    print("This prevents collapse to constant output under augmentation")
+    print(f"Benchmark:    {args.benchmark}")
+    print(f"Action dim:   {benchmark_config['action_dim']}")
+    print("Key: ranking objective (InfoNCE) instead of BCE")
     print("=" * 60)
 
     device = torch.device(args.device)
     print(f"Device: {device}")
 
-    # Create output directory
-    output_dir = Path(args.output_dir)
+    # Create output directory (benchmark-specific)
+    output_dir = Path(args.output_dir) / args.benchmark
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # Create dataloaders
