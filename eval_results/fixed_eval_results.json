@@ -1,0 +1,12 @@
+{
+  "M_negatives": 15,
+  "threshold": -1.2391129732131958,
+  "clean_mean_score": -0.06142858336953554,
+  "success_mean_score": -0.7046485703332084,
+  "failure_mean_score": -9.68724629810878,
+  "separation": 8.982597727775572,
+  "failure_auroc": 1.0,
+  "failure_detection_rate": 1.0,
+  "false_alarm_rate": 0.11428571428571428,
+  "prefix_auroc": 1.0
+}

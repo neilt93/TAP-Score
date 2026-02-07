@@ -1,0 +1,50 @@
+[
+  {
+    "m_negatives": 7,
+    "aggregation": "percentile_10",
+    "success_mean": 0.4757560856938362,
+    "failure_mean": 0.4997595423460007,
+    "separation": -0.024003456652164468,
+    "failure_auroc": 0.4304
+  },
+  {
+    "m_negatives": 15,
+    "aggregation": "percentile_10",
+    "success_mean": 0.33785228204727175,
+    "failure_mean": 0.33823059925436977,
+    "separation": -0.0003783172070980223,
+    "failure_auroc": 0.4928
+  },
+  {
+    "m_negatives": 31,
+    "aggregation": "percentile_10",
+    "success_mean": 0.20758073028922083,
+    "failure_mean": 0.21773395547270774,
+    "separation": -0.010153225183486908,
+    "failure_auroc": 0.47359999999999997
+  },
+  {
+    "m_negatives": 15,
+    "aggregation": "min",
+    "success_mean": 0.10875913552939892,
+    "failure_mean": 0.12312248818576337,
+    "separation": -0.014363352656364445,
+    "failure_auroc": 0.43200000000000005
+  },
+  {
+    "m_negatives": 15,
+    "aggregation": "percentile_10",
+    "success_mean": 0.33785228204727175,
+    "failure_mean": 0.33823059925436977,
+    "separation": -0.0003783172070980223,
+    "failure_auroc": 0.4928
+  },
+  {
+    "m_negatives": 15,
+    "aggregation": "percentile_5",
+    "success_mean": 0.2539638352841139,
+    "failure_mean": 0.265470110014081,
+    "separation": -0.01150627472996707,
+    "failure_auroc": 0.4688
+  }
+]

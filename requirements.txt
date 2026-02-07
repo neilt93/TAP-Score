@@ -1,0 +1,28 @@
+# TAP-Score Project Dependencies
+
+# Deep Learning
+torch>=2.0.0
+torchvision>=0.15.0
+numpy>=1.24.0
+
+# Data
+zarr>=2.14.0
+h5py>=3.8.0
+
+# Visualization
+matplotlib>=3.7.0
+seaborn>=0.12.0
+
+# Evaluation
+scikit-learn>=1.2.0
+pandas>=2.0.0
+
+# Progress
+tqdm>=4.65.0
+
+# Config (for Diffusion Policy compatibility)
+hydra-core>=1.3.0
+omegaconf>=2.3.0
+
+# Experiment tracking (optional)
+# wandb>=0.15.0

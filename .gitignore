@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+.env
+
+# Data and checkpoints (too large for git)
+data/
+checkpoints/
+checkpoints_aug/
+checkpoints_aug_light/
+checkpoints_contrastive/
+
+# Baselines (cloned repo)
+baselines/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Jupyter
+.ipynb_checkpoints/
