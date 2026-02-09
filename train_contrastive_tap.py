@@ -81,6 +81,9 @@ def main():
     parser.add_argument("--temperature", type=float, default=0.1)
     parser.add_argument("--n_negatives", type=int, default=15, help="Number of negative actions per sample")
     parser.add_argument("--hard_negative_ratio", type=float, default=0.5, help="Fraction of hard negatives")
+    parser.add_argument("--use_deltas", action="store_true", help="Use delta encoding for state observations")
+    parser.add_argument("--use_nn_negatives", action="store_true", help="Use nearest-neighbor hard negatives for state obs")
+    parser.add_argument("--nn_negative_ratio", type=float, default=0.3, help="Fraction of negatives from NN states")
     parser.add_argument("--device", type=str, default="cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
     args = parser.parse_args()
 
@@ -89,11 +92,19 @@ def main():
     if args.data_dir is None:
         args.data_dir = str(get_data_path(args.benchmark))
 
+    # Get observation type from benchmark config
+    obs_type = benchmark_config.get('obs_type', 'image')
+
     print("=" * 60)
     print(f"Contrastive TAP-Score Training - {benchmark_config['name']}")
     print("=" * 60)
     print(f"Benchmark:    {args.benchmark}")
+    print(f"Obs type:     {obs_type}")
     print(f"Action dim:   {benchmark_config['action_dim']}")
+    if obs_type == 'state':
+        print(f"Obs dim:      {benchmark_config.get('obs_dim', 'auto')}")
+        print(f"Use deltas:   {args.use_deltas}")
+        print(f"NN negatives: {args.use_nn_negatives} (ratio: {args.nn_negative_ratio})")
     print("Key: ranking objective (InfoNCE) instead of BCE")
     print("=" * 60)
 
@@ -107,19 +118,38 @@ def main():
     # Create dataloaders
     print(f"\nLoading data from {args.data_dir}...")
     print(f"Negatives per sample: {args.n_negatives} ({int(args.hard_negative_ratio * 100)}% hard)")
+
+    # Build kwargs for dataloader
+    dataloader_kwargs = {
+        'obs_window': args.obs_window,
+        'action_chunk': args.action_chunk,
+        'n_negatives': args.n_negatives,
+        'hard_negative_ratio': args.hard_negative_ratio,
+    }
+
+    # Add state-specific options
+    if obs_type == 'state':
+        dataloader_kwargs['use_deltas'] = args.use_deltas
+        dataloader_kwargs['use_nn_negatives'] = args.use_nn_negatives
+        dataloader_kwargs['nn_negative_ratio'] = args.nn_negative_ratio
+
     train_loader, val_loader = create_contrastive_dataloaders(
         args.data_dir,
         batch_size=args.batch_size,
-        obs_window=args.obs_window,
-        action_chunk=args.action_chunk,
-        n_negatives=args.n_negatives,
-        hard_negative_ratio=args.hard_negative_ratio,
+        obs_type=obs_type,
+        **dataloader_kwargs,
     )
     print(f"Train batches: {len(train_loader)}, Val batches: {len(val_loader)}")
 
     # Get action dimension from dataset
     action_dim = train_loader.dataset.action_dim
     print(f"Auto-detected action_dim: {action_dim}")
+
+    # Get obs_dim from dataset for state observations
+    obs_dim = None
+    if obs_type == 'state':
+        obs_dim = train_loader.dataset.obs_dim
+        print(f"Auto-detected obs_dim: {obs_dim}")
 
     # Build model
     print("\nBuilding contrastive model...")
@@ -130,6 +160,9 @@ def main():
         "action_chunk": args.action_chunk,
         "hidden_dim": args.hidden_dim,
         "temperature": args.temperature,
+        "obs_type": obs_type,
+        "obs_dim": obs_dim,
+        "use_deltas": args.use_deltas if obs_type == 'state' else False,
     }
     model = build_contrastive_tap_model(config).to(device)
 

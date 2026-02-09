@@ -4,7 +4,7 @@
 
 When policy behavior deviates from expert demonstrations—whether due to observation shift, drift, or compounding errors—proposed action chunks fall off the expert manifold. TAP-Score, trained to recognize expert-like actions via contrastive learning, will produce low scores for these off-manifold proposals, enabling detection of action-observation inconsistency and optional intervention.
 
-We evaluate TAP on Push-T demonstrations and on **controlled off-manifold action corruptions** (held-out failure families) to measure early failure prediction. This provides a rigorous generalization test without requiring closed-loop policy rollouts.
+We evaluate TAP on Push-T expert demonstrations and on **synthetic off-manifold action corruptions** (held-out failure families) to measure early failure prediction. Note: current results use only offline expert data with synthetic perturbations — not actual closed-loop Diffusion Policy rollouts. Live DP integration is in progress.
 
 ---
 
@@ -119,6 +119,8 @@ All evaluations include visual perturbation (Gaussian noise, severity=0.5) to si
 
 ## Results
 
+> **Important caveat:** All results below were obtained using **synthetic action corruptions applied to expert demonstration data**, NOT from actual Diffusion Policy rollouts. "Success" episodes are expert demos with observation noise; "failure" episodes are expert demos with held-out action perturbations (scaling, bias, stuck, delayed). No real policy was run in a simulator to generate these numbers. Integration with a live Diffusion Policy in the PushT environment is in progress on RunPod — those results will provide the true end-to-end validation. Until then, these results demonstrate TAP-Score's ability to distinguish expert-consistent actions from synthetic off-manifold actions, but do not yet prove it can detect failures from a real deployed policy.
+
 ### Training Results
 
 | Metric | Value |
@@ -191,17 +193,29 @@ The M ablation shows consistent AUROC (0.99-1.00) across different negative set 
 
 ---
 
-## Conclusions
+## Limitations of Current Evaluation
 
-1. **Contrastive TAP-Score successfully detects off-expert-manifold behavior** with AUROC 0.998 on held-out failure types.
+These results have an important limitation: they were generated entirely from **offline expert data with synthetic action corruptions**, not from actual policy rollouts in a simulator. Specifically:
 
-2. **Generalization is real:** Training only on (noise, permute, mirror, random) negatives enables detection of (scaling, bias, stuck, delayed) failures.
+- **"Success" episodes** = expert demonstrations with mild observation noise (still expert actions)
+- **"Failure" episodes** = expert demonstrations with synthetic action perturbations (scaling, bias, stuck, delayed)
+- **No actual Diffusion Policy was run** to generate these episodes
 
-3. **Early warning works:** 99.7% AUROC using only the first 70% of the episode.
+This means the AUROC 0.998 demonstrates that TAP-Score can distinguish expert actions from synthetically corrupted actions, but it does not yet prove that TAP-Score can detect when a real deployed policy (e.g., Diffusion Policy) produces bad actions in response to perturbed observations or compounding errors.
 
-4. **Practical utility:** 94.3% detection at 1% false alarm rate, 100% at 5% FPR.
+**End-to-end integration with a live Diffusion Policy** in the PushT simulator is currently running on RunPod. Those results — comparing TAP scores on clean DP rollouts vs. perturbed DP rollouts (with noise/blur corrupted observations) — will provide the true validation of TAP-Score's practical utility.
 
-5. **No perturbation labels needed:** Training on action-mismatch negatives alone enables generalization to visual perturbations.
+## Conclusions (Provisional)
+
+1. **Contrastive TAP-Score successfully detects synthetically off-expert-manifold actions** with AUROC 0.998 on held-out synthetic failure types.
+
+2. **Generalization across synthetic failure types is real:** Training only on (noise, permute, mirror, random) negatives enables detection of (scaling, bias, stuck, delayed) synthetic failures.
+
+3. **Early warning works on synthetic data:** 99.7% AUROC using only the first 70% of the episode.
+
+4. **Practical utility (pending live validation):** 94.3% detection at 1% false alarm rate, 100% at 5% FPR — on synthetic failures. Live DP integration results pending.
+
+5. **No perturbation labels needed:** Training on action-mismatch negatives alone enables generalization to unseen synthetic perturbation types.
 
 ### Reproduction
 
@@ -221,7 +235,8 @@ Results are saved to `eval_results/final_eval_results.json`.
 
 ```
 +--------------------------------------------------------------------+
-|                     CONTRASTIVE TAP RESULTS                         |
+|          CONTRASTIVE TAP RESULTS (Synthetic Failures Only)          |
+|          Live DP integration results pending (RunPod)               |
 +--------------------------------------------------------------------+
 | Held-out Failure AUROC:        0.998                               |
 | Prefix-Only AUROC:             0.997  (early warning)              |
@@ -240,5 +255,8 @@ Results are saved to `eval_results/final_eval_results.json`.
 +--------------------------------------------------------------------+
 
 Training negatives: noise, permute, mirror, random
-Held-out failures:  scaling, bias, stuck, delayed
+Held-out failures:  scaling, bias, stuck, delayed (all synthetic)
+
+NOTE: All numbers above are from synthetic action corruptions
+on expert data. Live Diffusion Policy integration in progress.
 ```

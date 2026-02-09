@@ -35,6 +35,9 @@ def load_model(checkpoint_path, device):
         action_chunk=config.get("action_chunk", 16),
         hidden_dim=config.get("hidden_dim", 128),
         temperature=config.get("temperature", 0.1),
+        obs_type=config.get("obs_type", "image"),
+        obs_dim=config.get("obs_dim"),
+        use_deltas=config.get("use_deltas", False),
     )
     model.load_state_dict(checkpoint['model_state_dict'])
     model.to(device)
@@ -55,9 +58,14 @@ def build_negative_pool(episodes, action_chunk, n_samples=2000):
     return np.stack(pool)
 
 
-def perturb_observation(obs, severity=0.5):
+def perturb_observation(obs, severity=0.5, obs_type='image'):
+    """Perturb observation with noise."""
     noise = np.random.randn(*obs.shape).astype(np.float32) * (0.3 * severity)
-    return np.clip(obs + noise, 0, 1)
+    if obs_type == 'image':
+        return np.clip(obs + noise, 0, 1)
+    else:
+        # For state observations, add noise directly (no clipping)
+        return obs + noise * 0.1  # Smaller noise for state observations
 
 
 def simulate_success_action(expert_action):
@@ -65,8 +73,15 @@ def simulate_success_action(expert_action):
     return expert_action + noise
 
 
-def simulate_failure_heldout(expert_action):
-    """HELD-OUT failures NOT in training negatives."""
+def simulate_failure_heldout(expert_action, magnitude_preserving=False):
+    """HELD-OUT failures NOT in training negatives.
+
+    If magnitude_preserving=True, uses failures that preserve per-step L2 norms
+    to avoid trivial magnitude-based detection.
+    """
+    if magnitude_preserving:
+        return simulate_failure_magnitude_preserving(expert_action)
+
     failure_type = np.random.randint(4)
     if failure_type == 0:
         scale = np.random.choice([0.5, 0.7, 1.5, 2.0])
@@ -83,6 +98,66 @@ def simulate_failure_heldout(expert_action):
         delayed[:k] = expert_action[0]
         delayed[k:] = expert_action[:-k] if k < len(expert_action) else expert_action[0]
         return delayed.astype(np.float32)
+
+
+def simulate_failure_magnitude_preserving(expert_action):
+    """Magnitude-preserving failures that test true compatibility learning.
+
+    All failures preserve per-step L2 norms, forcing the model to use
+    state-action structure rather than magnitude cues.
+    """
+    failure_type = np.random.randint(5)
+
+    if failure_type == 0:
+        # Rotation: rotate action vectors by random angle (2D only)
+        if expert_action.shape[1] == 2:
+            angle = np.random.uniform(np.pi/4, np.pi)  # 45-180 degrees
+            cos_a, sin_a = np.cos(angle), np.sin(angle)
+            rot = np.array([[cos_a, -sin_a], [sin_a, cos_a]], dtype=np.float32)
+            return (expert_action @ rot.T).astype(np.float32)
+        else:
+            # For higher dims, apply random rotation matrix
+            d = expert_action.shape[1]
+            q, _ = np.linalg.qr(np.random.randn(d, d))
+            return (expert_action @ q.T).astype(np.float32)
+
+    elif failure_type == 1:
+        # Axis swap: swap action dimensions
+        swapped = expert_action.copy()
+        d = expert_action.shape[1]
+        perm = np.random.permutation(d)
+        return swapped[:, perm].astype(np.float32)
+
+    elif failure_type == 2:
+        # Sign flip: randomly flip signs but preserve magnitude
+        signs = np.random.choice([-1, 1], size=expert_action.shape)
+        return (expert_action * signs).astype(np.float32)
+
+    elif failure_type == 3:
+        # Time warp: shuffle temporal order (preserves per-step magnitude)
+        n_steps = len(expert_action)
+        # Reverse, or random permutation of chunks
+        if np.random.random() < 0.5:
+            return expert_action[::-1].copy().astype(np.float32)
+        else:
+            # Shuffle in chunks of 4
+            chunk_size = 4
+            n_chunks = n_steps // chunk_size
+            chunks = [expert_action[i*chunk_size:(i+1)*chunk_size] for i in range(n_chunks)]
+            remainder = expert_action[n_chunks*chunk_size:]
+            np.random.shuffle(chunks)
+            if len(remainder) > 0:
+                chunks.append(remainder)
+            return np.concatenate(chunks, axis=0).astype(np.float32)
+
+    else:
+        # Direction noise: add noise then renormalize to original magnitude
+        noise = np.random.randn(*expert_action.shape).astype(np.float32) * 0.5
+        perturbed = expert_action + noise
+        # Renormalize each step to match original magnitude
+        orig_norms = np.linalg.norm(expert_action, axis=1, keepdims=True) + 1e-8
+        new_norms = np.linalg.norm(perturbed, axis=1, keepdims=True) + 1e-8
+        return (perturbed * orig_norms / new_norms).astype(np.float32)
 
 
 def score_action_logmargin(model, obs, action, negative_pool, device, m_negatives):
@@ -107,12 +182,20 @@ def baseline_action_magnitude(action_chunk):
 
 
 def score_episode(model, episode, negative_pool, device, config,
-                  failure_fn=None, m_negatives=M_NEGATIVES, prefix_only=False):
+                  failure_fn=None, m_negatives=M_NEGATIVES, prefix_only=False,
+                  magnitude_preserving=False):
     obs_window = config.get("obs_window", 2)
     action_chunk = config.get("action_chunk", 16)
-    images = episode['images']
+    obs_type = config.get("obs_type", "image")
+
+    # Get observations based on type
+    if obs_type == 'image':
+        observations = episode['images']
+    else:
+        observations = episode['obs']
+
     actions = episode['actions']
-    ep_len = len(images)
+    ep_len = len(observations)
 
     if ep_len < obs_window + action_chunk:
         return None, None
@@ -126,14 +209,23 @@ def score_episode(model, episode, negative_pool, device, config,
 
     for t in range(obs_window - 1, end_t):
         start_t = t - obs_window + 1
-        obs = images[start_t:t + 1].astype(np.float32) / 255.0
-        obs = np.transpose(obs, (0, 3, 1, 2))
-        obs = perturb_observation(obs)
+
+        if obs_type == 'image':
+            # Process image observations
+            obs = observations[start_t:t + 1].astype(np.float32) / 255.0
+            obs = np.transpose(obs, (0, 3, 1, 2))
+        else:
+            # Process state observations (no normalization or transpose needed)
+            obs = observations[start_t:t + 1].astype(np.float32)
+
+        obs = perturb_observation(obs, obs_type=obs_type)
 
         expert_action = actions[t:t + action_chunk].astype(np.float32)
 
         if failure_fn is None:
             policy_action = simulate_success_action(expert_action)
+        elif magnitude_preserving:
+            policy_action = simulate_failure_magnitude_preserving(expert_action)
         else:
             policy_action = failure_fn(expert_action)
 
@@ -185,6 +277,8 @@ def main():
     parser.add_argument("--output_dir", type=str, default="eval_results")
     parser.add_argument("--n_episodes", type=int, default=40)
     parser.add_argument("--device", type=str, default="cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
+    parser.add_argument("--magnitude_preserving", action="store_true",
+                        help="Use magnitude-preserving failures (rotation, axis swap, sign flip, time warp)")
     args = parser.parse_args()
 
     # Get benchmark config
@@ -204,7 +298,10 @@ def main():
     print(f"Checkpoint:   {args.checkpoint}")
     print(f"Data dir:     {args.data_dir}")
     print("\nTraining negatives: noise, permute, mirror, random")
-    print("Held-out failures:  scaling, bias, stuck, delayed (NOT in training)")
+    if args.magnitude_preserving:
+        print("Held-out failures:  rotation, axis_swap, sign_flip, time_warp, direction_noise (MAGNITUDE-PRESERVING)")
+    else:
+        print("Held-out failures:  scaling, bias, stuck, delayed (NOT in training)")
     print("=" * 70)
 
     device = torch.device(args.device)
@@ -239,7 +336,9 @@ def main():
             success_mag.append(mag)
 
     for ep in tqdm(test_episodes, desc="Held-out failure"):
-        tap, mag = score_episode(model, ep, negative_pool, device, config, failure_fn=simulate_failure_heldout)
+        tap, mag = score_episode(model, ep, negative_pool, device, config,
+                                  failure_fn=simulate_failure_heldout,
+                                  magnitude_preserving=args.magnitude_preserving)
         if tap is not None:
             failure_tap.append(tap)
             failure_mag.append(mag)
@@ -255,20 +354,23 @@ def main():
     print("AUROC Metrics")
     print("=" * 70)
 
-    # For AUROC: negate scores so higher = more anomalous
+    # For AUROC: compute with both orientations and report max
+    # (invariant to whether model outputs higher or lower scores for failures)
     all_tap = success_tap + failure_tap
     labels = [0] * len(success_tap) + [1] * len(failure_tap)
-    tap_auroc = roc_auc_score(labels, [-s for s in all_tap])
+    tap_auroc_raw = roc_auc_score(labels, [-s for s in all_tap])
+    tap_auroc = max(tap_auroc_raw, 1 - tap_auroc_raw)
+    tap_orientation = "lower margin → failure" if tap_auroc_raw >= 0.5 else "higher margin → failure"
 
-    # Baseline: action magnitude (higher = more anomalous directly)
+    # Baseline: action magnitude
     all_mag = success_mag + failure_mag
     mag_auroc_raw = roc_auc_score(labels, all_mag)
-    # Report best-oriented AUROC
     mag_auroc = max(mag_auroc_raw, 1 - mag_auroc_raw)
 
     print(f"TAP AUROC (held-out failures):     {tap_auroc:.3f}")
+    print(f"  Score orientation:               {tap_orientation}")
     print(f"Action Magnitude Baseline AUROC:   {mag_auroc:.3f}")
-    print(f"TAP advantage:                     +{tap_auroc - mag_auroc:.3f} (absolute)")
+    print(f"TAP advantage:                     {tap_auroc - mag_auroc:+.3f} (absolute)")
 
     # ========================================================================
     # 3. Operating points (TPR @ FPR)
@@ -280,12 +382,25 @@ def main():
     target_fprs = [0.01, 0.05, 0.10]
     operating_points = {}
 
+    # Determine score orientation from AUROC computation
+    score_flipped = tap_auroc_raw < 0.5  # If true, higher scores indicate failure
+
+    print(f"\n(Using orientation: {'higher' if score_flipped else 'lower'} score → failure)")
     print("\n| FPR Target | Threshold τ | TPR (Detection Rate) |")
     print("|------------|-------------|----------------------|")
 
     for target_fpr in target_fprs:
-        tau = find_threshold_at_fpr(success_tap, target_fpr)
-        tpr, actual_fpr = compute_metrics_at_threshold(success_tap, failure_tap, tau)
+        if score_flipped:
+            # Higher score = failure: threshold at upper percentile of success scores
+            tau = np.percentile(success_tap, 100 - target_fpr * 100)
+            # FPR: fraction of successes above tau
+            actual_fpr = np.mean([s > tau for s in success_tap])
+            # TPR: fraction of failures above tau
+            tpr = np.mean([s > tau for s in failure_tap])
+        else:
+            # Lower score = failure: use original logic
+            tau = find_threshold_at_fpr(success_tap, target_fpr)
+            tpr, actual_fpr = compute_metrics_at_threshold(success_tap, failure_tap, tau)
         operating_points[f'{int(target_fpr*100)}%'] = {'tau': tau, 'tpr': tpr, 'fpr': actual_fpr}
         print(f"| {target_fpr*100:5.0f}%     | {tau:11.2f} | {tpr*100:19.1f}% |")
 
@@ -308,14 +423,17 @@ def main():
                 m_success.append(tap)
 
         for ep in tqdm(test_episodes[:20], desc=f"M={m} fail", leave=False):
-            tap, _ = score_episode(model, ep, negative_pool, device, config, failure_fn=simulate_failure_heldout, m_negatives=m)
+            tap, _ = score_episode(model, ep, negative_pool, device, config,
+                                    failure_fn=simulate_failure_heldout, m_negatives=m,
+                                    magnitude_preserving=args.magnitude_preserving)
             if tap is not None:
                 m_failure.append(tap)
 
         if len(m_success) > 0 and len(m_failure) > 0:
             all_scores = m_success + m_failure
             m_labels = [0] * len(m_success) + [1] * len(m_failure)
-            m_auroc = roc_auc_score(m_labels, [-s for s in all_scores])
+            m_auroc_raw = roc_auc_score(m_labels, [-s for s in all_scores])
+            m_auroc = max(m_auroc_raw, 1 - m_auroc_raw)
             m_results[m] = m_auroc
 
     print("\n| M (negatives) | AUROC |")
@@ -338,14 +456,17 @@ def main():
             prefix_success.append(tap)
 
     for ep in tqdm(test_episodes[:25], desc="Prefix failure"):
-        tap, _ = score_episode(model, ep, negative_pool, device, config, failure_fn=simulate_failure_heldout, prefix_only=True)
+        tap, _ = score_episode(model, ep, negative_pool, device, config,
+                                failure_fn=simulate_failure_heldout, prefix_only=True,
+                                magnitude_preserving=args.magnitude_preserving)
         if tap is not None:
             prefix_failure.append(tap)
 
     if len(prefix_success) > 0 and len(prefix_failure) > 0:
         prefix_all = prefix_success + prefix_failure
         prefix_labels = [0] * len(prefix_success) + [1] * len(prefix_failure)
-        prefix_auroc = roc_auc_score(prefix_labels, [-s for s in prefix_all])
+        prefix_auroc_raw = roc_auc_score(prefix_labels, [-s for s in prefix_all])
+        prefix_auroc = max(prefix_auroc_raw, 1 - prefix_auroc_raw)
         print(f"\nPrefix-only AUROC: {prefix_auroc:.3f}")
         print("(Using only first 70% of episode to predict eventual failure)")
 
