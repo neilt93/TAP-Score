@@ -1,0 +1,191 @@
+# TAP-Score Results Writeup
+
+## Phase 1: Basic TAP (Contrastive Two-Tower)
+
+### 1.1 Problem Statement
+
+In visuomotor imitation learning, policies like Diffusion Policy can silently fail — producing actions that look plausible but lead to task failure. There is no built-in mechanism to detect when a policy's proposed actions have drifted off the expert manifold. We want a lightweight scorer that, given the current observation and a proposed action chunk, can flag whether that action is consistent with expert behavior.
+
+### 1.2 Architecture: Contrastive Two-Tower
+
+**What we built:**
+- Observation encoder: CNN (3-channel 96x96 images, obs window T=2)
+- Action encoder: MLP (action chunks of length H)
+- Scoring: dot product of L2-normalized embeddings, scaled by temperature
+- Loss: InfoNCE — rank the correct action above M negatives
+- Inference score: log-margin = logit[correct] - logsumexp(logit[negatives])
+
+**Key files:** `tap/contrastive.py`, `tap/dataset.py`, `train_contrastive_tap.py`
+
+**Hyperparameters:**
+| Parameter | Value |
+|-----------|-------|
+| hidden_dim | 128 |
+| temperature | 0.1 |
+| M (negatives) | 15 |
+| hard_negative_ratio | 0.5 |
+| obs_window | 2 |
+| batch_size | 64 |
+| epochs | 30 |
+
+### 1.3 What We Tried First (and Failed): BCE Classification
+
+The original `train_tap.py` used binary cross-entropy to classify (obs, action) pairs as positive/negative. This **collapsed completely** — the model learned to output a constant score regardless of input, achieving ~50% accuracy on balanced data.
+
+**Why it failed:** With binary labels, there's no incentive to use observations. Any constant prediction achieves baseline accuracy. The model has no reason to learn what expert behavior looks like.
+
+**Lesson learned:** You need a ranking objective, not a classification one, when the task is "does this action fit this observation?"
+
+### 1.4 Offline Evaluation (Synthetic Failures)
+
+Before integrating with Diffusion Policy, we validated TAP on synthetic action corruptions applied to expert demonstrations.
+
+**Training negatives:** noise (gaussian), permutation (temporal shuffle), mirroring (sign flip), random (different trajectory)
+
+**Held-out test failures (never seen in training):** scaling (0.5x-2.0x), constant bias, stuck policy, delayed reaction
+
+**Results on synthetic data:**
+
+| Metric | TAP-Score | Action Magnitude Baseline |
+|--------|-----------|---------------------------|
+| Held-out failure AUROC | **0.998** | 0.665 |
+| Prefix-only AUROC (first 70%) | **0.997** | — |
+| TPR @ 1% FPR | 94.3% | — |
+| TPR @ 5% FPR | 100.0% | — |
+
+**M ablation (stability):** AUROC 0.990 (M=7), 1.000 (M=15), 0.993 (M=31) — stable.
+
+**Caveat:** These numbers are on synthetic corruptions of expert data, not real policy rollouts. They show TAP learns the expert manifold, but don't prove it works on actual DP failures.
+
+### 1.5 Live DP Integration
+
+We integrated TAP into closed-loop Diffusion Policy rollouts on Push-T (RunPod, GPU). This required fixing several critical issues:
+
+**Bugs fixed during integration:**
+- **Observation history update:** DP needs to see consecutive frames, not the same frame repeated. Initially the obs history wasn't being updated after env steps, causing the policy to see stale frames.
+- **Perturbation consistency:** Perturbations (noise, blur, occlusion) must be applied consistently on both reset and step, with per-episode RNG seeded by the episode seed.
+- **Paired seeds:** To compare conditions (clean vs perturbed, K=1 vs K=4), same seeds must produce same initial states. We used `env.seed(seed)` before each reset.
+- **Horizon mismatch:** DP uses action_chunk=8 (n_action_steps=8), but original TAP was trained with H=16. We retrained with H=8 to match.
+- **Success labeling:** Push-T success = max_reward >= 0.80 at any point during the episode.
+
+**Retrained TAP H=8 checkpoint:** `checkpoints_contrastive/pusht/contrastive_tap_h8_best.pt`
+
+### 1.6 Passive Detection Results (TAP as Detector)
+
+Using TAP H=8 in closed-loop DP rollouts (50 episodes per condition, paired seeds):
+
+**DP baseline success rates:**
+- Clean: 54%
+- Noise (std=0.30): 48%
+- Blur (sigma=2.0): 54%
+
+**TAP detection performance:**
+
+| Metric | Value |
+|--------|-------|
+| Success vs failure AUROC (p10) | **0.690** |
+| Clean vs perturbed AUROC (p10) | **0.812** |
+| Mean TAP score (clean) | -1.56 |
+| Mean TAP score (noise) | -5.32 |
+| Mean TAP score (blur) | -1.84 |
+
+**Early warning behavior:**
+- 53/72 failures flagged before episode end
+- Median flag index: step 5 (out of ~25 policy steps)
+- Mean lead time: 17.2 policy steps
+- 88.7% of flagged failures detected early (within prefix)
+
+**Interpretation:** TAP reliably separates clean from perturbed observations (AUROC 0.81). Success vs failure separation is weaker (0.69) because many failures under blur look similar to successes in TAP-score space — blur doesn't shift scores as dramatically as noise.
+
+### 1.7 Active Reranking (TAP as Selector)
+
+**Idea:** Instead of just detecting bad actions, use TAP to actively improve the policy. At each step, sample K action chunks from DP, score each with TAP, execute the best one.
+
+**Implementation:** `eval_dp_reranking.py`
+- Batched K sampling: repeat_interleave obs K times, run DP once, reshape to (B, K, H, Da)
+- Vectorized TAP scoring: score all K candidates per env in one forward pass
+- Margin gate: optionally require margin_delta gap before overriding candidate 0
+- No-TAP control: sample K candidates but always pick index 0 (isolates RNG effect from TAP effect)
+
+### 1.8 Critical Insight: Causal Controls
+
+**The pitfall we caught:** When K>1, DP samples K independent action chunks. Even picking candidate 0 gives different behavior than K=1, because the internal RNG state differs. So comparing K=4 TAP vs K=1 is **not** a valid causal comparison — any success difference could be from sampling randomness, not TAP.
+
+**Solution:** Two controls:
+1. **No-TAP control:** Sample K candidates, always pick index 0. Same RNG path as TAP condition, but no TAP selection.
+2. **changed_any flag:** Only count an episode as a "TAP rescue" if TAP actually selected a non-zero candidate on at least one step.
+
+**The only valid causal metric:** success(K=4 TAP) - success(K=4 notap)
+
+### 1.9 Perturbation Sweet Spot
+
+**What killed DP entirely (reranking can't help if policy scores 0%):**
+- Full occlusion (20px patch): 0% success
+- Brightness (1.5x): 0% success
+
+**Sweet spot (DP partially degrades, room for reranking to help):**
+- prob_occlusion (30% chance of 12px patch per step): ~26-36% success
+- mild_blur (sigma=1.0): moderate degradation
+
+### 1.10 The Alignment Problem
+
+**First reranking attempt (TAP trained on synthetic negatives):**
+On mild_blur, K=4 TAP performed *worse* than the K=4 no-TAP control. Zero true TAP rescues.
+
+**Root cause:** TAP was trained to distinguish expert actions from synthetic negatives (random, permuted, noisy). But reranking asks TAP to choose the *best* among K plausible DP proposals — all of which are close to expert-like. TAP couldn't tell them apart because its negatives were too easy.
+
+**Lesson learned:** Detection and selection are fundamentally different tasks. A good anomaly detector is not necessarily a good selector among near-expert candidates.
+
+### 1.11 DP-Proposal Negative Retraining
+
+**Fix:** Retrain TAP using actual DP proposals as hard negatives.
+
+**DP neg cache construction** (`scripts/build_dp_neg_cache_pusht.py`):
+- For each expert (obs, action) sample, run DP K=8 times to get 8 candidate action chunks
+- Store as `dp_neg_cache.npz`: shape (N_samples, 8, 8, 2)
+- Also store aligned expert actions for distance computation
+
+**Distance analysis:**
+- DP proposals are a mix of near-expert and far-from-expert
+- Used `dp_neg_top_m=4` (closest 4 of 8 candidates) as hard negatives
+- This forces TAP to learn fine-grained discrimination within DP's proposal distribution
+
+**Retraining:** `train_contrastive_tap.py --dp_neg_cache_path dp_neg_cache.npz --dp_neg_ratio 0.5 --dp_neg_top_m 4`
+- 50% of negatives from DP cache (closest 4), 50% from standard synthetic negatives
+- Val accuracy ~0.32 (harder task than before, as expected)
+
+### 1.12 Reranking After DP-Neg Retrain (n=50)
+
+**Conditions:** prob_occlusion, K=4, with no-TAP control, 50 episodes
+
+| Condition | Success Rate |
+|-----------|-------------|
+| K=1 (baseline) | 36% |
+| K=4 TAP (DP-neg retrained) | **30%** |
+| K=4 no-TAP control | 26% |
+
+**Causal effect:** TAP - notap = +4 pp (30% vs 26%)
+
+**True TAP rescues (notap fails, TAP succeeds, TAP changed selection):** seeds [10, 17, 38] — 3 episodes
+
+**Note:** K=1 at 36% is higher than K=4 conditions. This is because K>1 sampling introduces additional variance. The valid comparison is TAP vs notap at the same K.
+
+### 1.13 Where Phase 1 Ended
+
+**Two reportable stories:**
+
+1. **Passive detection (strong):** TAP trained on expert demos can detect when DP is operating under perturbation (AUROC 0.81) and provides early warning of failures (median lead time: 17 policy steps). This works with the basic synthetic-negative-trained TAP.
+
+2. **Active reranking (promising but underpowered):** After retraining TAP with DP-proposal negatives, best-of-4 reranking shows +4pp causal improvement over the no-TAP control on prob_occlusion. Three confirmed rescue episodes. But n=50 is too small for statistical significance.
+
+**Unresolved at end of Phase 1:**
+- Need n=200 reranking eval for statistical power
+- Effect size is small (+4pp) — may wash out or strengthen at scale
+- Should try K=8 and margin gating to potentially amplify the effect
+- If reranking effect washes out, fall back to passive detection story only
+
+---
+
+## Phase 2: [New Architecture]
+
+*To be written.*
