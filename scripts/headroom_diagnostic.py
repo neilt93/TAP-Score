@@ -33,6 +33,30 @@ from tqdm import tqdm
 
 from diffusion_policy.env.pusht.pusht_image_env import PushTImageEnv
 from tap.env_wrapper import PushTStateWrapper
+from tap.perturbations import apply_occlusion, apply_gaussian_noise
+
+
+def perturb_obs_tensor(obs_tensor, perturb_type, prob=0.5):
+    """Apply perturbation to image obs in-place with probability prob.
+
+    obs_tensor: dict with 'image' key of shape (B, T, C, H, W) on device.
+    Perturbation is applied per-sample independently.
+    """
+    if perturb_type is None or "image" not in obs_tensor:
+        return obs_tensor
+    img = obs_tensor["image"]  # (B, T, C, H, W)
+    img_np = img.cpu().numpy()
+    for b in range(img_np.shape[0]):
+        if np.random.rand() < prob:
+            if perturb_type == "occlusion":
+                img_np[b] = apply_occlusion(img_np[b], patch_size=24)
+            elif perturb_type == "noise":
+                img_np[b] = apply_gaussian_noise(img_np[b], std=0.12)
+            elif perturb_type == "both":
+                img_np[b] = apply_occlusion(img_np[b], patch_size=24)
+                img_np[b] = apply_gaussian_noise(img_np[b], std=0.08)
+    obs_tensor["image"] = torch.from_numpy(img_np).to(img.device)
+    return obs_tensor
 
 
 def load_diffusion_policy(checkpoint_path: str, device: torch.device):
@@ -129,7 +153,8 @@ def _init_branch(branch_env, seed, saved_state, saved_obs_history):
 def batched_continuation_with_info(branch_envs, branch_obs_histories, branch_dones,
                                    branch_max_rewards, branch_max_progress,
                                    branch_total_contacts, dp_policy, n_obs_steps,
-                                   n_action_steps, L, device, executor):
+                                   n_action_steps, L, device, executor,
+                                   perturb_type=None, perturb_prob=0.5):
     K = len(branch_envs)
     for _ in range(L):
         active = [k for k in range(K) if not branch_dones[k]]
@@ -147,8 +172,9 @@ def batched_continuation_with_info(branch_envs, branch_obs_histories, branch_don
                 batch_obs[key].append(tensor)
 
         batch_tensor = {k: torch.cat(v, dim=0).to(device) for k, v in batch_obs.items()}
+        perturb_obs_tensor(batch_tensor, perturb_type, perturb_prob)
 
-        with torch.cuda.amp.autocast(dtype=torch.float16):
+        with torch.amp.autocast("cuda", dtype=torch.float16):
             action_dict = dp_policy.predict_action(batch_tensor)
         all_chunks = action_dict["action"].detach().cpu().numpy()
 
@@ -177,16 +203,29 @@ def main():
     parser.add_argument("--skip_first", type=int, default=2)
     parser.add_argument("--max_env_steps", type=int, default=200)
     parser.add_argument("--seed_offset", type=int, default=0)
-    parser.add_argument("--output", type=str, default="eval_results/headroom_diagnostic.json")
+    parser.add_argument("--output", type=str, default=None)
+    parser.add_argument("--perturb", type=str, default=None,
+                        choices=["occlusion", "noise", "both"],
+                        help="Perturb obs fed to DP (env stays clean)")
+    parser.add_argument("--perturb_prob", type=float, default=0.5,
+                        help="Probability of applying perturbation per sample")
     parser.add_argument("--device", type=str, default="cuda" if torch.cuda.is_available() else "cpu")
     args = parser.parse_args()
+
+    if args.output is None:
+        suffix = f"_perturb_{args.perturb}" if args.perturb else ""
+        args.output = f"eval_results/headroom_diagnostic{suffix}.json"
 
     device = torch.device(args.device)
     K = args.K
     L = args.L
+    perturb_type = args.perturb
+    perturb_prob = args.perturb_prob
 
     print("=" * 60)
     print(f"Headroom Diagnostic (K={K}, L={L})")
+    if perturb_type:
+        print(f"  Perturbation: {perturb_type} (prob={perturb_prob})")
     print("=" * 60)
 
     torch.set_grad_enabled(False)
@@ -244,9 +283,10 @@ def main():
                     dp_goal_pose = np.array(env.env.goal_pose)
                 dp_progress_at_decision = compute_progress(dp_block_pose, dp_goal_pose)
 
-                # Sample K candidates
+                # Sample K candidates (perturb obs fed to DP, env stays clean)
                 obs_expanded = {k: v.repeat_interleave(K, dim=0) for k, v in obs_tensor.items()}
-                with torch.cuda.amp.autocast(dtype=torch.float16):
+                perturb_obs_tensor(obs_expanded, perturb_type, perturb_prob)
+                with torch.amp.autocast("cuda", dtype=torch.float16):
                     action_dict = dp_policy.predict_action(obs_expanded)
                 candidates = action_dict["action"].detach().cpu().numpy()
 
@@ -283,6 +323,7 @@ def main():
                         branch_max_rewards, branch_max_progress,
                         branch_total_contacts, dp_policy, n_obs_steps,
                         n_action_steps, L, device, executor,
+                        perturb_type=perturb_type, perturb_prob=perturb_prob,
                     )
 
                 rewards_k = np.array(branch_max_rewards)
@@ -320,8 +361,10 @@ def main():
                         done = True
                         break
             else:
-                with torch.cuda.amp.autocast(dtype=torch.float16):
-                    action_dict = dp_policy.predict_action(obs_tensor)
+                obs_for_dp = {k: v.clone() for k, v in obs_tensor.items()}
+                perturb_obs_tensor(obs_for_dp, perturb_type, perturb_prob)
+                with torch.amp.autocast("cuda", dtype=torch.float16):
+                    action_dict = dp_policy.predict_action(obs_for_dp)
                 chunk = action_dict["action"][0].detach().cpu().numpy()
                 for act in chunk:
                     obs, reward, done, info = env.step(act)
@@ -422,7 +465,8 @@ def main():
     results = {
         "config": {"K": K, "L": L, "n_episodes": args.n_episodes,
                    "decision_interval": args.decision_interval,
-                   "skip_first": args.skip_first},
+                   "skip_first": args.skip_first,
+                   "perturb": perturb_type, "perturb_prob": perturb_prob},
         "summary": {
             "n_decision_points": n,
             "n_contact": n_contact,
