@@ -64,16 +64,66 @@ def load_diffusion_policy(checkpoint_path: str, device: torch.device):
     return policy, cfg
 
 
-def load_tap_model(checkpoint_path: str, config_path: str, device: torch.device):
-    with open(config_path) as f:
-        config = json.load(f)
-    model = build_contrastive_tap_model(config)
+def _infer_action_chunk_from_state_dict(state_dict: Dict[str, torch.Tensor], action_dim: int) -> int:
+    """Infer action_chunk from first action encoder layer input width."""
+    key = "action_encoder.mlp.0.weight"
+    if key not in state_dict:
+        raise ValueError(f"Missing expected key '{key}' in checkpoint state_dict.")
+    in_dim = int(state_dict[key].shape[1])
+    if in_dim % action_dim != 0:
+        raise ValueError(
+            f"Invalid action encoder input dim {in_dim} for action_dim {action_dim}; cannot infer action_chunk."
+        )
+    return in_dim // action_dim
+
+
+def load_tap_model(checkpoint_path: str, config_path: str | None, device: torch.device):
     ckpt = torch.load(checkpoint_path, map_location=device, weights_only=False)
-    # Handle training checkpoint format (has 'model_state_dict' key)
-    if isinstance(ckpt, dict) and "model_state_dict" in ckpt:
-        model.load_state_dict(ckpt["model_state_dict"])
+    ckpt_config = ckpt.get("config") if isinstance(ckpt, dict) else None
+    ext_config = None
+    if config_path is not None:
+        with open(config_path) as f:
+            ext_config = json.load(f)
+
+    # Prefer checkpoint-embedded config; only use external config as fallback/consistency check.
+    if ckpt_config is not None:
+        config = dict(ckpt_config)
+        if ext_config is not None:
+            keys = [
+                "action_chunk", "action_dim", "obs_window", "obs_channels",
+                "hidden_dim", "temperature", "obs_type", "obs_dim", "use_deltas",
+            ]
+            mismatches = []
+            for k in keys:
+                if k in ext_config and k in ckpt_config and ext_config[k] != ckpt_config[k]:
+                    mismatches.append((k, ext_config[k], ckpt_config[k]))
+            if mismatches:
+                details = ", ".join([f"{k}: ext={v1} ckpt={v2}" for k, v1, v2 in mismatches])
+                raise ValueError(
+                    f"TAP config mismatch between --tap_config and checkpoint-embedded config ({details}). "
+                    "Use checkpoint config or matching config file."
+                )
+    elif ext_config is not None:
+        config = dict(ext_config)
     else:
-        model.load_state_dict(ckpt)
+        raise ValueError("No TAP config found: checkpoint has no embedded config and --tap_config was not provided.")
+
+    model = build_contrastive_tap_model(config)
+    # Handle training checkpoint format (has 'model_state_dict' key)
+    state_dict = ckpt["model_state_dict"] if isinstance(ckpt, dict) and "model_state_dict" in ckpt else ckpt
+    model.load_state_dict(state_dict)
+
+    # Hard consistency check: config action_chunk must match model weights.
+    action_dim = int(config.get("action_dim", 2))
+    inferred_chunk = _infer_action_chunk_from_state_dict(state_dict, action_dim)
+    config_chunk = int(config.get("action_chunk", inferred_chunk))
+    if config_chunk != inferred_chunk:
+        raise ValueError(
+            f"TAP checkpoint/config mismatch: config action_chunk={config_chunk}, "
+            f"but weights imply action_chunk={inferred_chunk}."
+        )
+    config["action_chunk"] = inferred_chunk
+
     model.to(device).eval()
     return model, config
 
@@ -251,9 +301,9 @@ def main():
     parser = argparse.ArgumentParser(description="Reranking Experiment")
     parser.add_argument("--dp_checkpoint", type=str, required=True)
     parser.add_argument("--tap_checkpoint", type=str, default=None,
-                        help="Optional TAP checkpoint. If omitted with --tap_config, runs vanilla DP baseline.")
+                        help="Optional TAP checkpoint. If omitted, runs vanilla DP baseline.")
     parser.add_argument("--tap_config", type=str, default=None,
-                        help="Optional TAP config. If omitted with --tap_checkpoint, runs vanilla DP baseline.")
+                        help="Optional TAP config. If omitted, checkpoint-embedded config is used.")
     parser.add_argument("--n_episodes", type=int, default=20)
     parser.add_argument("--K", type=int, default=8)
     parser.add_argument("--L", type=int, default=5)
@@ -279,8 +329,8 @@ def main():
     parser.add_argument("--device", type=str, default="cuda" if torch.cuda.is_available() else "cpu")
     args = parser.parse_args()
 
-    if (args.tap_checkpoint is None) != (args.tap_config is None):
-        raise ValueError("Provide both --tap_checkpoint and --tap_config, or omit both for baseline mode.")
+    if args.tap_config is not None and args.tap_checkpoint is None:
+        raise ValueError("--tap_config requires --tap_checkpoint.")
     use_tap = args.tap_checkpoint is not None
 
     if args.output is None:
@@ -342,6 +392,11 @@ def main():
         tap_model, tap_config = load_tap_model(args.tap_checkpoint, args.tap_config, device)
         tap_action_chunk = tap_config["action_chunk"]  # 16
         print(f"  TAP action_chunk={tap_action_chunk}, hidden_dim={tap_config['hidden_dim']}")
+        tap_obs_window = int(tap_config.get("obs_window", n_obs_steps))
+        if tap_obs_window != n_obs_steps:
+            raise ValueError(
+                f"Obs-window mismatch: TAP expects obs_window={tap_obs_window}, DP runtime uses n_obs_steps={n_obs_steps}."
+            )
 
     env_pool = [PushTStateWrapper(PushTImageEnv(legacy=False, render_size=96)) for _ in range(K)]
     executor = ThreadPoolExecutor(max_workers=K)
@@ -422,24 +477,24 @@ def main():
 
                 # ── TAP scoring ──────────────────────────────
                 if use_tap:
-                    # Get full 16-step predictions for TAP scoring
-                    action_pred_full = action_dict["action_pred"].detach()  # (K, 16, 2)
-
                     # Default: TAP sees clean obs. With --tap_sees_perturb: same perturbed obs.
                     if tap_sees_perturb:
                         tap_obs = obs_for_dp["image"][0:1]  # exact DP-conditioned perturbed obs
                     else:
                         tap_obs = obs_tensor["image"]  # (1, T, C, H, W) — clean
-                    # TAP expects actions as (B, M, H, action_dim)
-                    tap_actions = action_pred_full.unsqueeze(0).float()  # (1, K, 16, 2)
-
-                    # Pad or truncate to TAP's expected chunk size
-                    if tap_actions.shape[2] < tap_action_chunk:
-                        pad = torch.zeros(1, K, tap_action_chunk - tap_actions.shape[2], 2,
-                                          device=device)
-                        tap_actions = torch.cat([tap_actions, pad], dim=2)
-                    elif tap_actions.shape[2] > tap_action_chunk:
-                        tap_actions = tap_actions[:, :, :tap_action_chunk, :]
+                    # TAP expects actions as (B, M, H, action_dim).
+                    # If TAP H matches executed chunk length, score exact executed candidates.
+                    if tap_action_chunk == candidates_exec.shape[1]:
+                        tap_actions_np = candidates_exec
+                    else:
+                        # Fallback to full DP prediction horizon when TAP H differs.
+                        action_pred_full = action_dict["action_pred"].detach().cpu().numpy()  # (K, Hpred, 2)
+                        if action_pred_full.shape[1] < tap_action_chunk:
+                            raise ValueError(
+                                f"TAP expects action_chunk={tap_action_chunk}, but DP action_pred has horizon={action_pred_full.shape[1]}."
+                            )
+                        tap_actions_np = action_pred_full[:, :tap_action_chunk, :]
+                    tap_actions = torch.from_numpy(tap_actions_np).to(device).float().unsqueeze(0)
 
                     tap_logits = tap_model(tap_obs, tap_actions)  # (1, K)
                     tap_scores = tap_logits[0].cpu().numpy()  # (K,)
