@@ -30,3 +30,6 @@ Thumbs.db
 
 # Jupyter
 .ipynb_checkpoints/
+
+# Claude Code config (local only)
+CLAUDE.md

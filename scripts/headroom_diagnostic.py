@@ -9,7 +9,7 @@ block_pose, goal_pose, n_contacts at each decision point and for
 each candidate branch.
 
 Usage:
-    cd /pennstate-project && PYTHONPATH=/pennstate-project python scripts/headroom_diagnostic.py \
+    python scripts/headroom_diagnostic.py \
         --dp_checkpoint baselines/diffusion_policy/data/checkpoints/pusht_image_latest.ckpt \
         --n_episodes 20 --K 8 --L 5 --decision_interval 5 --skip_first 2 --device cuda
 """
@@ -33,30 +33,33 @@ from tqdm import tqdm
 
 from diffusion_policy.env.pusht.pusht_image_env import PushTImageEnv
 from tap.env_wrapper import PushTStateWrapper
-from tap.perturbations import apply_occlusion, apply_gaussian_noise
+from tap.perturbations import sample_patch_xy
 
 
-def perturb_obs_tensor(obs_tensor, perturb_type, prob=0.5):
-    """Apply perturbation to image obs in-place with probability prob.
-
-    obs_tensor: dict with 'image' key of shape (B, T, C, H, W) on device.
-    Perturbation is applied per-sample independently.
-    """
-    if perturb_type is None or "image" not in obs_tensor:
-        return obs_tensor
-    img = obs_tensor["image"]  # (B, T, C, H, W)
-    img_np = img.cpu().numpy()
-    for b in range(img_np.shape[0]):
-        if np.random.rand() < prob:
-            if perturb_type == "occlusion":
-                img_np[b] = apply_occlusion(img_np[b], patch_size=24)
-            elif perturb_type == "noise":
-                img_np[b] = apply_gaussian_noise(img_np[b], std=0.12)
-            elif perturb_type == "both":
-                img_np[b] = apply_occlusion(img_np[b], patch_size=24)
-                img_np[b] = apply_gaussian_noise(img_np[b], std=0.08)
-    obs_tensor["image"] = torch.from_numpy(img_np).to(img.device)
-    return obs_tensor
+def perturb_single_obs(img_np: np.ndarray, perturb_type: str, rng: np.random.Generator,
+                       patch_size: int = 24, prob: float = 0.5,
+                       xy: tuple = None) -> np.ndarray:
+    """Perturb a single observation. img_np: (T, C, H, W). Returns copy or original."""
+    if rng.random() < prob:
+        out = img_np.copy()
+        occ_slice = None
+        if perturb_type in ("occlusion", "both"):
+            _, _, H, W = out.shape
+            if xy is not None:
+                x, y = xy
+            else:
+                x, y = sample_patch_xy(H, W, patch_size, patch_size, rng)
+            occ_slice = (slice(None), slice(None),
+                         slice(y, y + patch_size), slice(x, x + patch_size))
+            out[occ_slice] = 0.0
+        if perturb_type in ("noise", "both"):
+            std = 0.08 if perturb_type == "both" else 0.12
+            noise = rng.standard_normal(out.shape, dtype=np.float32) * std
+            out = np.clip(out + noise, 0.0, 1.0)
+            if occ_slice is not None:
+                out[occ_slice] = 0.0
+        return out
+    return img_np
 
 
 def load_diffusion_policy(checkpoint_path: str, device: torch.device):
@@ -99,6 +102,16 @@ def stack_history(hist, T):
     return np.stack(padded, axis=0)
 
 
+def decision_perturb_seed(base_seed: int, episode_seed: int, policy_step: int) -> int:
+    """Deterministic seed for decision-point observation perturbation."""
+    return int(base_seed + episode_seed * 10000 + policy_step)
+
+
+def continuation_perturb_seed(base_seed: int, episode_seed: int, policy_step: int) -> int:
+    """Deterministic seed source for continuation-step perturbations."""
+    return int(base_seed + episode_seed * 10000 + policy_step * 100)
+
+
 def compute_progress(block_pose, goal_pose):
     """Progress = 1 - normalized distance to goal.
 
@@ -135,7 +148,8 @@ def _step_branch_chunk_with_info(branch_env, branch_obs_hist, chunk, n_action_st
         if info and "block_pose" in info and "goal_pose" in info:
             prog = compute_progress(info["block_pose"], info["goal_pose"])
             max_progress = max(max_progress, prog)
-        total_contacts += info.get("n_contacts", 0)
+        if info:
+            total_contacts += info.get("n_contacts", 0)
         last_info = info
         if d:
             done = True
@@ -154,9 +168,10 @@ def batched_continuation_with_info(branch_envs, branch_obs_histories, branch_don
                                    branch_max_rewards, branch_max_progress,
                                    branch_total_contacts, dp_policy, n_obs_steps,
                                    n_action_steps, L, device, executor,
-                                   perturb_type=None, perturb_prob=0.5):
+                                   perturb_type=None, perturb_prob=0.5,
+                                   patch_size=24, cont_rng=None, xy=None):
     K = len(branch_envs)
-    for _ in range(L):
+    for l_step in range(L):
         active = [k for k in range(K) if not branch_dones[k]]
         if not active:
             break
@@ -172,7 +187,18 @@ def batched_continuation_with_info(branch_envs, branch_obs_histories, branch_don
                 batch_obs[key].append(tensor)
 
         batch_tensor = {k: torch.cat(v, dim=0).to(device) for k, v in batch_obs.items()}
-        perturb_obs_tensor(batch_tensor, perturb_type, perturb_prob)
+        # ONE camera → same perturbation fate for all branches at each step.
+        # Same coin flip (perturb or not) and same patch position across branches.
+        if perturb_type is not None and "image" in batch_tensor:
+            img = batch_tensor["image"]
+            img_np = img.cpu().numpy()
+            step_seed = cont_rng.integers(0, 2**31) if cont_rng is not None else None
+            for b in range(img_np.shape[0]):
+                b_rng = np.random.default_rng(step_seed)
+                img_np[b] = perturb_single_obs(img_np[b], perturb_type, b_rng,
+                                                patch_size=patch_size, prob=perturb_prob,
+                                                xy=xy)
+            batch_tensor["image"] = torch.from_numpy(img_np).to(img.device)
 
         with torch.amp.autocast("cuda", dtype=torch.float16):
             action_dict = dp_policy.predict_action(batch_tensor)
@@ -209,23 +235,44 @@ def main():
                         help="Perturb obs fed to DP (env stays clean)")
     parser.add_argument("--perturb_prob", type=float, default=0.5,
                         help="Probability of applying perturbation per sample")
+    parser.add_argument("--patch_size", type=int, default=24,
+                        help="Occlusion patch size in pixels")
+    parser.add_argument("--perturb_seed", type=int, default=42,
+                        help="Seed for perturbation RNG (reproducible masks)")
+    parser.add_argument("--occlusion_mode", type=str, default="step",
+                        choices=["step", "episode"],
+                        help="step: new random patch each step. "
+                             "episode: one fixed patch for entire episode.")
     parser.add_argument("--device", type=str, default="cuda" if torch.cuda.is_available() else "cpu")
     args = parser.parse_args()
 
     if args.output is None:
-        suffix = f"_perturb_{args.perturb}" if args.perturb else ""
-        args.output = f"eval_results/headroom_diagnostic{suffix}.json"
+        prob_tag = str(args.perturb_prob).replace(".", "p")
+        seed_tag = f"seed{args.perturb_seed}"
+        if args.perturb is None:
+            condition_tag = "clean"
+        else:
+            condition_tag = f"perturb_{args.perturb}_p{prob_tag}_patch{args.patch_size}"
+        args.output = (
+            f"eval_results/headroom_{condition_tag}_"
+            f"K{args.K}_L{args.L}_di{args.decision_interval}_skip{args.skip_first}_{seed_tag}.json"
+        )
 
     device = torch.device(args.device)
     K = args.K
     L = args.L
     perturb_type = args.perturb
     perturb_prob = args.perturb_prob
+    patch_size = args.patch_size
+    perturb_base_seed = args.perturb_seed
+    occlusion_mode = args.occlusion_mode
 
     print("=" * 60)
     print(f"Headroom Diagnostic (K={K}, L={L})")
     if perturb_type:
-        print(f"  Perturbation: {perturb_type} (prob={perturb_prob})")
+        print(f"  Perturbation: {perturb_type} (prob={perturb_prob}, patch_size={patch_size})")
+        print(f"  Occlusion mode: {occlusion_mode}")
+        print(f"  Perturb seed: {perturb_base_seed}")
     print("=" * 60)
 
     torch.set_grad_enabled(False)
@@ -248,6 +295,12 @@ def main():
         env = PushTStateWrapper(PushTImageEnv(legacy=False, render_size=96))
         env.seed(seed)
         obs = env.reset()
+
+        # Episode-mode occlusion: one fixed patch for the entire episode
+        episode_xy = None
+        if perturb_type in ("occlusion", "both") and occlusion_mode == "episode":
+            ep_rng = np.random.default_rng(perturb_base_seed + seed * 10000)
+            episode_xy = sample_patch_xy(96, 96, patch_size, patch_size, ep_rng)
         normalize_obs_dict(obs)
 
         obs_history = defaultdict(list)
@@ -283,9 +336,23 @@ def main():
                     dp_goal_pose = np.array(env.env.goal_pose)
                 dp_progress_at_decision = compute_progress(dp_block_pose, dp_goal_pose)
 
-                # Sample K candidates (perturb obs fed to DP, env stays clean)
+                # Sample K candidates — perturb ONCE then replicate to K
+                # (one camera frame, K denoising samples)
                 obs_expanded = {k: v.repeat_interleave(K, dim=0) for k, v in obs_tensor.items()}
-                perturb_obs_tensor(obs_expanded, perturb_type, perturb_prob)
+                if perturb_type is not None:
+                    step_rng = np.random.default_rng(
+                        decision_perturb_seed(perturb_base_seed, seed, policy_step)
+                    )
+                    clean_np = obs_tensor["image"][0].cpu().numpy()
+                    perturbed_np = perturb_single_obs(clean_np, perturb_type, step_rng,
+                                                       patch_size=patch_size, prob=perturb_prob,
+                                                       xy=episode_xy)
+                    perturbed_t = torch.from_numpy(perturbed_np).to(device).float()
+                    obs_expanded["image"] = perturbed_t.unsqueeze(0).expand(K, -1, -1, -1, -1)
+                    # Invariant: one camera observation per decision point, shared across K candidates.
+                    shared_obs = obs_expanded["image"][0:1].expand_as(obs_expanded["image"])
+                    if not torch.allclose(obs_expanded["image"], shared_obs):
+                        raise RuntimeError("Shared-perturbation invariant violated: DP candidates saw different observations.")
                 with torch.amp.autocast("cuda", dtype=torch.float16):
                     action_dict = dp_policy.predict_action(obs_expanded)
                 candidates = action_dict["action"].detach().cpu().numpy()
@@ -318,12 +385,16 @@ def main():
 
                 # Batched continuation
                 if L > 0:
+                    cont_rng = np.random.default_rng(
+                        continuation_perturb_seed(perturb_base_seed, seed, policy_step)
+                    )
                     batched_continuation_with_info(
                         env_pool[:K], branch_obs_histories, branch_dones,
                         branch_max_rewards, branch_max_progress,
                         branch_total_contacts, dp_policy, n_obs_steps,
                         n_action_steps, L, device, executor,
                         perturb_type=perturb_type, perturb_prob=perturb_prob,
+                        patch_size=patch_size, cont_rng=cont_rng, xy=episode_xy,
                     )
 
                 rewards_k = np.array(branch_max_rewards)
@@ -362,7 +433,15 @@ def main():
                         break
             else:
                 obs_for_dp = {k: v.clone() for k, v in obs_tensor.items()}
-                perturb_obs_tensor(obs_for_dp, perturb_type, perturb_prob)
+                if perturb_type is not None:
+                    step_rng = np.random.default_rng(
+                        decision_perturb_seed(perturb_base_seed, seed, policy_step)
+                    )
+                    clean_np = obs_for_dp["image"][0].cpu().numpy()
+                    perturbed_np = perturb_single_obs(clean_np, perturb_type, step_rng,
+                                                       patch_size=patch_size, prob=perturb_prob,
+                                                       xy=episode_xy)
+                    obs_for_dp["image"] = torch.from_numpy(perturbed_np).to(device).float().unsqueeze(0)
                 with torch.amp.autocast("cuda", dtype=torch.float16):
                     action_dict = dp_policy.predict_action(obs_for_dp)
                 chunk = action_dict["action"][0].detach().cpu().numpy()
@@ -406,6 +485,7 @@ def main():
     print(f"\n{'─'*60}")
     print("REWARD-BASED ORACLE HEADROOM")
     print(f"{'─'*60}")
+    print("  (Reward is max step reward over candidate chunk + continuation, not episode coverage.)")
     for label, mask in [("All", np.ones(n, dtype=bool)),
                         ("Contact", contact_mask),
                         ("No contact", ~contact_mask)]:
@@ -425,6 +505,7 @@ def main():
     print(f"\n{'─'*60}")
     print("PROGRESS-BASED ORACLE HEADROOM")
     print(f"{'─'*60}")
+    print("  (Progress is max progress over candidate chunk + continuation.)")
     for label, mask in [("All", np.ones(n, dtype=bool)),
                         ("Contact", contact_mask),
                         ("No contact", ~contact_mask)]:
@@ -466,15 +547,25 @@ def main():
         "config": {"K": K, "L": L, "n_episodes": args.n_episodes,
                    "decision_interval": args.decision_interval,
                    "skip_first": args.skip_first,
-                   "perturb": perturb_type, "perturb_prob": perturb_prob},
+                   "perturb": perturb_type, "perturb_prob": perturb_prob,
+                   "patch_size": patch_size, "perturb_seed": perturb_base_seed,
+                   "occlusion_mode": occlusion_mode,
+                   "perturb_seed_formula_decision": "perturb_seed + seed*10000 + policy_step",
+                   "perturb_seed_formula_continuation_base": "perturb_seed + seed*10000 + policy_step*100",
+                   "reward_metric": "max_step_reward_over_candidate_chunk_plus_continuation",
+                   "progress_metric": "max_progress_over_candidate_chunk_plus_continuation"},
         "summary": {
             "n_decision_points": n,
             "n_contact": n_contact,
             "n_no_contact": n_no_contact,
             "reward_mean_improvement": float(reward_improvements.mean()),
             "reward_median_improvement": float(np.median(reward_improvements)),
+            "max_step_reward_mean_improvement": float(reward_improvements.mean()),
+            "max_step_reward_median_improvement": float(np.median(reward_improvements)),
             "progress_mean_improvement": float(progress_improvements.mean()),
             "progress_median_improvement": float(np.median(progress_improvements)),
+            "max_progress_mean_improvement": float(progress_improvements.mean()),
+            "max_progress_median_improvement": float(np.median(progress_improvements)),
             "reward_frac_improvement_gt_0.01": float(np.mean(reward_improvements > 0.01)),
             "progress_frac_improvement_gt_0.01": float(np.mean(progress_improvements > 0.01)),
         },

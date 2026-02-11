@@ -10,11 +10,17 @@ Report "fraction of oracle headroom captured":
   (TAP - notap) / (oracle - notap)
 
 Usage:
-    cd /pennstate-project && PYTHONPATH=/pennstate-project python scripts/reranking_experiment.py \
+    # Tier 0 baseline (vanilla DP; TAP disabled)
+    python scripts/reranking_experiment.py \
+        --dp_checkpoint baselines/diffusion_policy/data/checkpoints/pusht_image_latest.ckpt \
+        --n_episodes 200 --K 1 --L 5 --seed_offset 0 --perturb_seed 123 \
+        --output outputs/baseline_clean_n200.json
+
+    python scripts/reranking_experiment.py \
         --dp_checkpoint baselines/diffusion_policy/data/checkpoints/pusht_image_latest.ckpt \
         --tap_checkpoint checkpoints_contrastive/pusht/contrastive_tap_best.pt \
         --tap_config checkpoints_contrastive/pusht/config.json \
-        --n_episodes 20 --K 8 --L 5 --perturb occlusion --device cuda
+        --n_episodes 20 --K 8 --L 5 --perturb occlusion --patch_size 24 --device cuda
 """
 from __future__ import annotations
 
@@ -37,7 +43,7 @@ from tqdm import tqdm
 from diffusion_policy.env.pusht.pusht_image_env import PushTImageEnv
 from tap.env_wrapper import PushTStateWrapper
 from tap.contrastive import ContrastiveTAPScore, build_contrastive_tap_model
-from tap.perturbations import apply_occlusion, apply_gaussian_noise
+from tap.perturbations import sample_patch_xy
 
 
 # ── helpers ──────────────────────────────────────────────────
@@ -94,22 +100,59 @@ def stack_history(hist, T):
     return np.stack(padded, axis=0)
 
 
-def perturb_obs_tensor(obs_tensor, perturb_type, prob=0.5):
-    if perturb_type is None or "image" not in obs_tensor:
-        return obs_tensor
-    img = obs_tensor["image"]
-    img_np = img.cpu().numpy()
-    for b in range(img_np.shape[0]):
-        if np.random.rand() < prob:
-            if perturb_type == "occlusion":
-                img_np[b] = apply_occlusion(img_np[b], patch_size=24)
-            elif perturb_type == "noise":
-                img_np[b] = apply_gaussian_noise(img_np[b], std=0.12)
-            elif perturb_type == "both":
-                img_np[b] = apply_occlusion(img_np[b], patch_size=24)
-                img_np[b] = apply_gaussian_noise(img_np[b], std=0.08)
-    obs_tensor["image"] = torch.from_numpy(img_np).to(img.device)
-    return obs_tensor
+def decision_perturb_seed(base_seed: int, episode_seed: int, policy_step: int) -> int:
+    """Deterministic seed for decision-point observation perturbation."""
+    return int(base_seed + episode_seed * 10000 + policy_step)
+
+
+def continuation_perturb_seed(base_seed: int, episode_seed: int, policy_step: int) -> int:
+    """Deterministic seed source for continuation-step perturbations."""
+    return int(base_seed + episode_seed * 10000 + policy_step * 100)
+
+
+def mean_ci95(values: np.ndarray) -> Dict[str, float]:
+    """Return mean and 95% normal-approx CI for a 1D array."""
+    arr = np.asarray(values, dtype=np.float64)
+    n = int(arr.size)
+    if n == 0:
+        return {"mean": float("nan"), "ci95_low": float("nan"), "ci95_high": float("nan"), "n": 0}
+    mean = float(arr.mean())
+    if n == 1:
+        return {"mean": mean, "ci95_low": mean, "ci95_high": mean, "n": 1}
+    se = float(arr.std(ddof=1) / np.sqrt(n))
+    half = 1.96 * se
+    return {"mean": mean, "ci95_low": mean - half, "ci95_high": mean + half, "n": n}
+
+
+def perturb_single_obs(img_np: np.ndarray, perturb_type: str, rng: np.random.Generator,
+                       patch_size: int = 24, prob: float = 0.5,
+                       xy: tuple = None) -> np.ndarray:
+    """Perturb a single observation image. Returns perturbed copy or original.
+
+    img_np: (T, C, H, W) single observation window.
+    xy: optional (x, y) to fix the occlusion patch position (episode mode).
+        If provided, skips sampling a new position from rng.
+    """
+    if rng.random() < prob:
+        out = img_np.copy()
+        occ_slice = None
+        if perturb_type in ("occlusion", "both"):
+            _, _, H, W = out.shape
+            if xy is not None:
+                x, y = xy
+            else:
+                x, y = sample_patch_xy(H, W, patch_size, patch_size, rng)
+            occ_slice = (slice(None), slice(None),
+                         slice(y, y + patch_size), slice(x, x + patch_size))
+            out[occ_slice] = 0.0
+        if perturb_type in ("noise", "both"):
+            std = 0.08 if perturb_type == "both" else 0.12
+            noise = rng.standard_normal(out.shape, dtype=np.float32) * std
+            out = np.clip(out + noise, 0.0, 1.0)
+            if occ_slice is not None:
+                out[occ_slice] = 0.0
+        return out
+    return img_np
 
 
 def compute_progress(block_pose, goal_pose):
@@ -146,9 +189,12 @@ def _init_branch(branch_env, seed, saved_state, saved_obs_history):
 def batched_continuation(branch_envs, branch_obs_histories, branch_dones,
                          branch_max_rewards, dp_policy, n_obs_steps,
                          n_action_steps, L, device, executor,
-                         perturb_type=None, perturb_prob=0.5):
+                         perturb_type=None, perturb_prob=0.5,
+                         patch_size=24, cont_rng=None, xy=None):
+    """Continue L policy steps on each branch. Each branch gets its own observation
+    (from its own env), but perturbation is applied with a shared RNG for reproducibility."""
     K = len(branch_envs)
-    for _ in range(L):
+    for l_step in range(L):
         active = [k for k in range(K) if not branch_dones[k]]
         if not active:
             break
@@ -164,7 +210,23 @@ def batched_continuation(branch_envs, branch_obs_histories, branch_dones,
                 batch_obs[key].append(tensor)
 
         batch_tensor = {k: torch.cat(v, dim=0).to(device) for k, v in batch_obs.items()}
-        perturb_obs_tensor(batch_tensor, perturb_type, perturb_prob)
+
+        # ONE camera → same perturbation fate for all branches at each step.
+        # Draw one seed per continuation step; all branches share the coin flip
+        # (perturb or not) and patch position.  Images differ (different states).
+        if perturb_type is not None and "image" in batch_tensor:
+            if cont_rng is None:
+                raise ValueError("cont_rng must be provided when perturb_type is set.")
+            img = batch_tensor["image"]
+            img_np = img.cpu().numpy()
+            step_seed = cont_rng.integers(0, 2**31) if cont_rng is not None else None
+            for b in range(img_np.shape[0]):
+                branch_rng = np.random.default_rng(step_seed)  # same seed → same flip/patch
+                img_np[b] = perturb_single_obs(
+                    img_np[b], perturb_type, branch_rng,
+                    patch_size=patch_size, prob=perturb_prob, xy=xy,
+                )
+            batch_tensor["image"] = torch.from_numpy(img_np).to(img.device)
 
         with torch.amp.autocast("cuda", dtype=torch.float16):
             action_dict = dp_policy.predict_action(batch_tensor)
@@ -188,8 +250,10 @@ def batched_continuation(branch_envs, branch_obs_histories, branch_dones,
 def main():
     parser = argparse.ArgumentParser(description="Reranking Experiment")
     parser.add_argument("--dp_checkpoint", type=str, required=True)
-    parser.add_argument("--tap_checkpoint", type=str, required=True)
-    parser.add_argument("--tap_config", type=str, required=True)
+    parser.add_argument("--tap_checkpoint", type=str, default=None,
+                        help="Optional TAP checkpoint. If omitted with --tap_config, runs vanilla DP baseline.")
+    parser.add_argument("--tap_config", type=str, default=None,
+                        help="Optional TAP config. If omitted with --tap_checkpoint, runs vanilla DP baseline.")
     parser.add_argument("--n_episodes", type=int, default=20)
     parser.add_argument("--K", type=int, default=8)
     parser.add_argument("--L", type=int, default=5)
@@ -200,6 +264,14 @@ def main():
     parser.add_argument("--perturb", type=str, default=None,
                         choices=["occlusion", "noise", "both"])
     parser.add_argument("--perturb_prob", type=float, default=0.5)
+    parser.add_argument("--patch_size", type=int, default=24,
+                        help="Occlusion patch size in pixels")
+    parser.add_argument("--perturb_seed", type=int, default=42,
+                        help="Seed for perturbation RNG (reproducible masks)")
+    parser.add_argument("--occlusion_mode", type=str, default="step",
+                        choices=["step", "episode"],
+                        help="step: new random patch each policy step. "
+                             "episode: one fixed patch for entire episode (tape on lens).")
     parser.add_argument("--tap_sees_perturb", action="store_true",
                         help="If set, TAP also sees perturbed obs (harder/fairer test). "
                              "Default: TAP sees clean obs.")
@@ -207,24 +279,48 @@ def main():
     parser.add_argument("--device", type=str, default="cuda" if torch.cuda.is_available() else "cpu")
     args = parser.parse_args()
 
+    if (args.tap_checkpoint is None) != (args.tap_config is None):
+        raise ValueError("Provide both --tap_checkpoint and --tap_config, or omit both for baseline mode.")
+    use_tap = args.tap_checkpoint is not None
+
     if args.output is None:
-        suffix = f"_perturb_{args.perturb}" if args.perturb else "_clean"
-        if args.tap_sees_perturb:
-            suffix += "_tap_perturbed"
-        args.output = f"eval_results/reranking{suffix}.json"
+        prob_tag = str(args.perturb_prob).replace(".", "p")
+        seed_tag = f"seed{args.perturb_seed}"
+        if args.perturb is None:
+            condition_tag = "clean"
+        else:
+            condition_tag = f"perturb_{args.perturb}_p{prob_tag}_patch{args.patch_size}"
+        if use_tap:
+            tap_view_tag = "tap_perturbed" if args.tap_sees_perturb else "tap_clean"
+        else:
+            tap_view_tag = "tap_disabled"
+        args.output = (
+            f"eval_results/reranking_{condition_tag}_{tap_view_tag}_"
+            f"K{args.K}_L{args.L}_di{args.decision_interval}_skip{args.skip_first}_{seed_tag}.json"
+        )
 
     device = torch.device(args.device)
     K = args.K
     L = args.L
     perturb_type = args.perturb
     perturb_prob = args.perturb_prob
+    patch_size = args.patch_size
     tap_sees_perturb = args.tap_sees_perturb
+    occlusion_mode = args.occlusion_mode
+
+    # Reproducible perturbation RNG — derive per-episode, per-step seeds from this
+    perturb_base_seed = args.perturb_seed
 
     print("=" * 60)
     print(f"Reranking Experiment (K={K}, L={L})")
     if perturb_type:
-        print(f"  Perturbation: {perturb_type} (prob={perturb_prob})")
+        print(f"  Perturbation: {perturb_type} (prob={perturb_prob}, patch_size={patch_size})")
+        print(f"  Occlusion mode: {occlusion_mode}")
+        print(f"  Perturb seed: {perturb_base_seed}")
+    if use_tap:
         print(f"  TAP sees:     {'perturbed' if tap_sees_perturb else 'clean'} obs")
+    else:
+        print("  TAP mode:     disabled (vanilla DP baseline)")
     print("=" * 60)
 
     torch.set_grad_enabled(False)
@@ -238,10 +334,14 @@ def main():
     n_obs_steps = int(dp_cfg.task.env_runner.n_obs_steps)
     print(f"  n_action_steps={n_action_steps}, n_obs_steps={n_obs_steps}")
 
-    print("Loading TAP-Score model...")
-    tap_model, tap_config = load_tap_model(args.tap_checkpoint, args.tap_config, device)
-    tap_action_chunk = tap_config["action_chunk"]  # 16
-    print(f"  TAP action_chunk={tap_action_chunk}, hidden_dim={tap_config['hidden_dim']}")
+    tap_model = None
+    tap_config = None
+    tap_action_chunk = None
+    if use_tap:
+        print("Loading TAP-Score model...")
+        tap_model, tap_config = load_tap_model(args.tap_checkpoint, args.tap_config, device)
+        tap_action_chunk = tap_config["action_chunk"]  # 16
+        print(f"  TAP action_chunk={tap_action_chunk}, hidden_dim={tap_config['hidden_dim']}")
 
     env_pool = [PushTStateWrapper(PushTImageEnv(legacy=False, render_size=96)) for _ in range(K)]
     executor = ThreadPoolExecutor(max_workers=K)
@@ -254,6 +354,12 @@ def main():
         env.seed(seed)
         obs = env.reset()
         normalize_obs_dict(obs)
+
+        # Episode-mode occlusion: one fixed patch for the entire episode
+        episode_xy = None
+        if perturb_type in ("occlusion", "both") and occlusion_mode == "episode":
+            ep_rng = np.random.default_rng(perturb_base_seed + seed * 10000)
+            episode_xy = sample_patch_xy(96, 96, patch_size, patch_size, ep_rng)
 
         obs_history = defaultdict(list)
         for key, val in obs.items():
@@ -281,39 +387,66 @@ def main():
 
                 dp_n_contacts = int(env.n_contact_points)
 
-                # Sample K candidates from DP (with perturbation)
-                obs_expanded = {k: v.repeat_interleave(K, dim=0) for k, v in obs_tensor.items()}
-                obs_for_dp = {k: v.clone() for k, v in obs_expanded.items()}
-                perturb_obs_tensor(obs_for_dp, perturb_type, perturb_prob)
+                # ── Perturb ONCE, share across K candidates ──
+                # Generate one perturbed observation, then replicate to K.
+                # This models reality: one camera frame, K denoising samples.
+                clean_obs_np = obs_tensor["image"][0].cpu().numpy()  # (T, C, H, W)
+
+                if perturb_type is not None:
+                    # Deterministic per-seed, per-step RNG for reproducibility
+                    step_rng = np.random.default_rng(
+                        decision_perturb_seed(perturb_base_seed, seed, policy_step)
+                    )
+                    perturbed_obs_np = perturb_single_obs(
+                        clean_obs_np, perturb_type, step_rng,
+                        patch_size=patch_size, prob=perturb_prob,
+                        xy=episode_xy,
+                    )
+                else:
+                    perturbed_obs_np = clean_obs_np
+
+                # Replicate the SAME perturbed obs to K copies for DP
+                perturbed_obs_t = torch.from_numpy(perturbed_obs_np).to(device).float()
+                obs_for_dp = {k: v.repeat_interleave(K, dim=0) for k, v in obs_tensor.items()}
+                obs_for_dp["image"] = perturbed_obs_t.unsqueeze(0).expand(K, -1, -1, -1, -1)
+                # Invariant: one camera observation per decision point, shared across K candidates.
+                shared_obs = obs_for_dp["image"][0:1].expand_as(obs_for_dp["image"])
+                if not torch.allclose(obs_for_dp["image"], shared_obs):
+                    raise RuntimeError("Shared-perturbation invariant violated: DP candidates saw different observations.")
 
                 with torch.amp.autocast("cuda", dtype=torch.float16):
                     action_dict = dp_policy.predict_action(obs_for_dp)
 
-                # Get full 16-step predictions for TAP scoring
-                action_pred_full = action_dict["action_pred"].detach()  # (K, 16, 2)
                 # Get 8-step chunks for env execution
                 candidates_exec = action_dict["action"].detach().cpu().numpy()  # (K, 8, 2)
 
                 # ── TAP scoring ──────────────────────────────
-                # Default: TAP sees clean obs. With --tap_sees_perturb: same degraded obs as DP.
-                if tap_sees_perturb:
-                    tap_obs = obs_for_dp["image"][:1]  # (1, T, C, H, W) — perturbed
+                if use_tap:
+                    # Get full 16-step predictions for TAP scoring
+                    action_pred_full = action_dict["action_pred"].detach()  # (K, 16, 2)
+
+                    # Default: TAP sees clean obs. With --tap_sees_perturb: same perturbed obs.
+                    if tap_sees_perturb:
+                        tap_obs = obs_for_dp["image"][0:1]  # exact DP-conditioned perturbed obs
+                    else:
+                        tap_obs = obs_tensor["image"]  # (1, T, C, H, W) — clean
+                    # TAP expects actions as (B, M, H, action_dim)
+                    tap_actions = action_pred_full.unsqueeze(0).float()  # (1, K, 16, 2)
+
+                    # Pad or truncate to TAP's expected chunk size
+                    if tap_actions.shape[2] < tap_action_chunk:
+                        pad = torch.zeros(1, K, tap_action_chunk - tap_actions.shape[2], 2,
+                                          device=device)
+                        tap_actions = torch.cat([tap_actions, pad], dim=2)
+                    elif tap_actions.shape[2] > tap_action_chunk:
+                        tap_actions = tap_actions[:, :, :tap_action_chunk, :]
+
+                    tap_logits = tap_model(tap_obs, tap_actions)  # (1, K)
+                    tap_scores = tap_logits[0].cpu().numpy()  # (K,)
+                    tap_pick = int(tap_scores.argmax())
                 else:
-                    tap_obs = obs_tensor["image"]  # (1, T, C, H, W) — clean
-                # TAP expects actions as (B, M, H, action_dim)
-                tap_actions = action_pred_full.unsqueeze(0).float()  # (1, K, 16, 2)
-
-                # Pad or truncate to TAP's expected chunk size
-                if tap_actions.shape[2] < tap_action_chunk:
-                    pad = torch.zeros(1, K, tap_action_chunk - tap_actions.shape[2], 2,
-                                      device=device)
-                    tap_actions = torch.cat([tap_actions, pad], dim=2)
-                elif tap_actions.shape[2] > tap_action_chunk:
-                    tap_actions = tap_actions[:, :, :tap_action_chunk, :]
-
-                tap_logits = tap_model(tap_obs, tap_actions)  # (1, K)
-                tap_scores = tap_logits[0].cpu().numpy()  # (K,)
-                tap_pick = int(tap_scores.argmax())
+                    tap_scores = np.zeros((K,), dtype=np.float32)
+                    tap_pick = 0
 
                 # ── Branch rollouts ──────────────────────────
                 init_futures = [
@@ -338,11 +471,15 @@ def main():
 
                 # Continuation
                 if L > 0:
+                    cont_rng = np.random.default_rng(
+                        continuation_perturb_seed(perturb_base_seed, seed, policy_step)
+                    )
                     batched_continuation(
                         env_pool[:K], branch_obs_histories, branch_dones,
                         branch_max_rewards, dp_policy, n_obs_steps,
                         n_action_steps, L, device, executor,
                         perturb_type=perturb_type, perturb_prob=perturb_prob,
+                        patch_size=patch_size, cont_rng=cont_rng, xy=episode_xy,
                     )
 
                 rewards_k = np.array(branch_max_rewards)
@@ -361,6 +498,10 @@ def main():
                     "reward_tap": float(rewards_k[tap_pick]),
                     "reward_oracle": float(rewards_k.max()),
                     "reward_spread": float(rewards_k.max() - rewards_k.min()),
+                    "tap_obs_source": (
+                        "perturbed" if (use_tap and tap_sees_perturb)
+                        else ("clean" if use_tap else "disabled")
+                    ),
                 })
 
                 # Continue episode with candidate 0 (baseline trajectory)
@@ -378,7 +519,17 @@ def main():
                         break
             else:
                 obs_for_dp = {k: v.clone() for k, v in obs_tensor.items()}
-                perturb_obs_tensor(obs_for_dp, perturb_type, perturb_prob)
+                if perturb_type is not None:
+                    step_rng = np.random.default_rng(
+                        decision_perturb_seed(perturb_base_seed, seed, policy_step)
+                    )
+                    clean_np = obs_for_dp["image"][0].cpu().numpy()
+                    perturbed_np = perturb_single_obs(
+                        clean_np, perturb_type, step_rng,
+                        patch_size=patch_size, prob=perturb_prob,
+                        xy=episode_xy,
+                    )
+                    obs_for_dp["image"] = torch.from_numpy(perturbed_np).to(device).float().unsqueeze(0)
                 with torch.amp.autocast("cuda", dtype=torch.float16):
                     action_dict = dp_policy.predict_action(obs_for_dp)
                 chunk = action_dict["action"][0].detach().cpu().numpy()
@@ -405,11 +556,15 @@ def main():
     headroom = r_oracle - r_notap
     tap_gain = r_tap - r_notap
 
+    # Changed frac: how often TAP picks something other than candidate 0
+    changed = sum(1 for d in all_dps if d["tap_pick"] != 0)
+    changed_frac = changed / n if n > 0 else 0.0
+
     # Fraction of oracle headroom captured (only where headroom > 0)
     has_headroom = headroom > 0.001
     if has_headroom.sum() > 0:
         capture_ratio = tap_gain[has_headroom] / headroom[has_headroom]
-        capture_ratio = np.clip(capture_ratio, 0, 1)  # TAP can't exceed oracle
+        capture_ratio = np.clip(capture_ratio, 0, 1)
         mean_capture = float(capture_ratio.mean())
         median_capture = float(np.median(capture_ratio))
     else:
@@ -428,28 +583,86 @@ def main():
         if d["reward_tap"] > d["reward_notap"] + 0.001
     )
 
+    # TAP harms: how often does TAP pick worse than candidate 0?
+    tap_harms = sum(
+        1 for d in all_dps
+        if d["reward_tap"] < d["reward_notap"] - 0.001
+    )
+
+    # ── Episode-level rollups ──
+    # Group decision points by episode and aggregate the decision-point endpoint.
+    episodes = defaultdict(list)
+    for d in all_dps:
+        episodes[d["episode"]].append(d)
+
+    ep_stats = []
+    for ep_idx in sorted(episodes.keys()):
+        ep_dps = episodes[ep_idx]
+        ep_notap_max = max(d["reward_notap"] for d in ep_dps)
+        ep_tap_max = max(d["reward_tap"] for d in ep_dps)
+        ep_oracle_max = max(d["reward_oracle"] for d in ep_dps)
+        ep_notap_mean = float(np.mean([d["reward_notap"] for d in ep_dps]))
+        ep_tap_mean = float(np.mean([d["reward_tap"] for d in ep_dps]))
+        ep_oracle_mean = float(np.mean([d["reward_oracle"] for d in ep_dps]))
+        ep_changed = sum(1 for d in ep_dps if d["tap_pick"] != 0)
+        ep_n_dps = len(ep_dps)
+        ep_stats.append({
+            "episode": ep_idx,
+            "seed": ep_dps[0]["seed"],
+            "n_decision_points": ep_n_dps,
+            "mean_reward_notap": ep_notap_mean,
+            "mean_reward_tap": ep_tap_mean,
+            "mean_reward_oracle": ep_oracle_mean,
+            "max_reward_notap": ep_notap_max,
+            "max_reward_tap": ep_tap_max,
+            "max_reward_oracle": ep_oracle_max,
+            "mean_lift": ep_tap_mean - ep_notap_mean,
+            "mean_headroom": ep_oracle_mean - ep_notap_mean,
+            "max_lift": ep_tap_max - ep_notap_max,
+            "max_headroom": ep_oracle_max - ep_notap_max,
+            "changed_frac": ep_changed / ep_n_dps if ep_n_dps > 0 else 0.0,
+        })
+
+    ep_mean_notap = np.array([e["mean_reward_notap"] for e in ep_stats], dtype=np.float64)
+    ep_mean_tap = np.array([e["mean_reward_tap"] for e in ep_stats], dtype=np.float64)
+    ep_mean_oracle = np.array([e["mean_reward_oracle"] for e in ep_stats], dtype=np.float64)
+    ep_mean_lifts = np.array([e["mean_lift"] for e in ep_stats], dtype=np.float64)
+    ep_mean_headrooms = np.array([e["mean_headroom"] for e in ep_stats], dtype=np.float64)
+    ep_mean_has_headroom = ep_mean_headrooms > 0.001
+    if ep_mean_has_headroom.sum() > 0:
+        ep_mean_captures = ep_mean_lifts[ep_mean_has_headroom] / ep_mean_headrooms[ep_mean_has_headroom]
+        ep_mean_captures = np.clip(ep_mean_captures, 0, 1)
+        ep_mean_capture = float(ep_mean_captures.mean())
+    else:
+        ep_mean_capture = 0.0
+    n_rescued = int((ep_mean_lifts > 0.001).sum())
+
     print("\n" + "=" * 60)
     print("RERANKING RESULTS")
     print("=" * 60)
-    print(f"\nDecision points: {n}")
-    print(f"With headroom (oracle > notap + 0.001): {has_headroom.sum()}/{n}")
 
     print(f"\n{'─'*60}")
-    print("MEAN REWARDS")
+    print("DECISION-POINT LEVEL")
     print(f"{'─'*60}")
-    print(f"  K_notap (baseline):  {r_notap.mean():.4f}")
-    print(f"  K_TAP (reranked):    {r_tap.mean():.4f}")
-    print(f"  Oracle best-of-K:    {r_oracle.mean():.4f}")
+    print(f"  Decision points: {n}")
+    print(f"  With headroom (oracle > notap + 0.001): {has_headroom.sum()}/{n}")
+    print(f"  Changed frac (TAP picks != 0):  {changed}/{n} ({changed_frac:.1%})")
 
-    print(f"\n{'─'*60}")
-    print("HEADROOM CAPTURE")
-    print(f"{'─'*60}")
-    print(f"  Mean TAP gain:              {tap_gain.mean():.4f}")
-    print(f"  Mean oracle headroom:       {headroom.mean():.4f}")
-    print(f"  Mean capture ratio:         {mean_capture:.1%}")
-    print(f"  Median capture ratio:       {median_capture:.1%}")
-    print(f"  TAP picks oracle best:      {tap_picks_oracle}/{n} ({tap_picks_oracle/n:.1%})")
-    print(f"  TAP beats baseline:         {tap_beats_baseline}/{n} ({tap_beats_baseline/n:.1%})")
+    print(f"\n  MEAN MAX-STEP REWARD OVER BRANCH HORIZON")
+    print(f"  (This is NOT episode coverage/success rate.)")
+    print(f"    K_notap (baseline):  {r_notap.mean():.4f}")
+    print(f"    K_TAP (reranked):    {r_tap.mean():.4f}")
+    print(f"    Oracle best-of-K:    {r_oracle.mean():.4f}")
+
+    print(f"\n  HEADROOM CAPTURE")
+    print(f"    Mean TAP gain:              {tap_gain.mean():.4f}")
+    print(f"    Mean oracle headroom:       {headroom.mean():.4f}")
+    print(f"    Mean capture ratio:         {mean_capture:.1%}")
+    print(f"    Median capture ratio:       {median_capture:.1%}")
+    print(f"    TAP picks oracle best:      {tap_picks_oracle}/{n} ({tap_picks_oracle/n:.1%})")
+    print(f"    TAP beats baseline:         {tap_beats_baseline}/{n} ({tap_beats_baseline/n:.1%})")
+    print(f"    TAP harms (picks worse):    {tap_harms}/{n} ({tap_harms/n:.1%})")
+    print(f"    Net benefit (helps-harms):  {tap_beats_baseline - tap_harms}/{n}")
 
     # Contact split
     contact_mask = np.array([d["n_contacts"] > 0 for d in all_dps])
@@ -463,10 +676,28 @@ def main():
             cr = np.clip(tg[hh] / hm[hh], 0, 1).mean()
         else:
             cr = 0.0
-        print(f"\n  [{label}] (n={mask.sum()})")
-        print(f"    Headroom:  {hm.mean():.4f}")
-        print(f"    TAP gain:  {tg.mean():.4f}")
-        print(f"    Capture:   {cr:.1%}")
+        print(f"\n    [{label}] (n={mask.sum()})")
+        print(f"      Headroom:  {hm.mean():.4f}")
+        print(f"      TAP gain:  {tg.mean():.4f}")
+        print(f"      Capture:   {cr:.1%}")
+
+    print(f"\n{'─'*60}")
+    print("EPISODE LEVEL")
+    print(f"{'─'*60}")
+    n_eps = len(ep_stats)
+    print(f"  Episodes: {n_eps}")
+    print(f"  Episodes with headroom: {int(ep_mean_has_headroom.sum())}/{n_eps}")
+    print(f"  Episodes rescued (lift > 0): {n_rescued}/{n_eps}")
+    ci_notap = mean_ci95(ep_mean_notap)
+    ci_tap = mean_ci95(ep_mean_tap)
+    ci_oracle = mean_ci95(ep_mean_oracle)
+    print("  Mean episode reward (decision-point metric aggregated within episode):")
+    print(f"    notap:   {ci_notap['mean']:.4f} [{ci_notap['ci95_low']:.4f}, {ci_notap['ci95_high']:.4f}]")
+    print(f"    TAP:     {ci_tap['mean']:.4f} [{ci_tap['ci95_low']:.4f}, {ci_tap['ci95_high']:.4f}]")
+    print(f"    oracle:  {ci_oracle['mean']:.4f} [{ci_oracle['ci95_low']:.4f}, {ci_oracle['ci95_high']:.4f}]")
+    print(f"  Mean episode lift:     {ep_mean_lifts.mean():.4f}")
+    print(f"  Mean episode headroom: {ep_mean_headrooms.mean():.4f}")
+    print(f"  Mean episode capture:  {ep_mean_capture:.1%}")
 
     print("\n" + "=" * 60)
 
@@ -479,21 +710,50 @@ def main():
             "decision_interval": args.decision_interval,
             "skip_first": args.skip_first,
             "perturb": perturb_type, "perturb_prob": perturb_prob,
-            "tap_sees_perturb": tap_sees_perturb,
+            "patch_size": patch_size, "perturb_seed": perturb_base_seed,
+            "occlusion_mode": occlusion_mode,
+            "use_tap": use_tap,
+            "tap_sees_perturb": tap_sees_perturb if use_tap else False,
+            "tap_checkpoint": args.tap_checkpoint,
+            "tap_config": args.tap_config,
+            "perturb_seed_formula_decision": "perturb_seed + seed*10000 + policy_step",
+            "perturb_seed_formula_continuation_base": "perturb_seed + seed*10000 + policy_step*100",
+            "reward_metric": "max_step_reward_over_candidate_chunk_plus_continuation",
         },
         "summary": {
             "n_decision_points": n,
             "n_with_headroom": int(has_headroom.sum()),
+            "changed_frac": changed_frac,
             "mean_reward_notap": float(r_notap.mean()),
             "mean_reward_tap": float(r_tap.mean()),
             "mean_reward_oracle": float(r_oracle.mean()),
+            "mean_max_step_reward_notap": float(r_notap.mean()),
+            "mean_max_step_reward_tap": float(r_tap.mean()),
+            "mean_max_step_reward_oracle": float(r_oracle.mean()),
             "mean_tap_gain": float(tap_gain.mean()),
             "mean_headroom": float(headroom.mean()),
             "mean_capture_ratio": mean_capture,
             "median_capture_ratio": median_capture,
             "tap_picks_oracle_frac": float(tap_picks_oracle / n),
             "tap_beats_baseline_frac": float(tap_beats_baseline / n),
+            "tap_harms_frac": float(tap_harms / n),
+            "net_benefit": tap_beats_baseline - tap_harms,
         },
+        "episode_summary": {
+            "n_episodes": n_eps,
+            "n_with_headroom": int(ep_mean_has_headroom.sum()),
+            "n_rescued": n_rescued,
+            "mean_episode_reward_notap": float(ep_mean_notap.mean()),
+            "mean_episode_reward_tap": float(ep_mean_tap.mean()),
+            "mean_episode_reward_oracle": float(ep_mean_oracle.mean()),
+            "mean_episode_reward_notap_ci95": mean_ci95(ep_mean_notap),
+            "mean_episode_reward_tap_ci95": mean_ci95(ep_mean_tap),
+            "mean_episode_reward_oracle_ci95": mean_ci95(ep_mean_oracle),
+            "mean_episode_lift": float(ep_mean_lifts.mean()),
+            "mean_episode_headroom": float(ep_mean_headrooms.mean()),
+            "mean_episode_capture_ratio": ep_mean_capture,
+        },
+        "episodes": ep_stats,
         "decision_points": all_dps,
     }
     with open(out_path, "w") as f:

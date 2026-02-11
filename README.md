@@ -1,131 +1,84 @@
-# Penn State Take-Home Project
+# TAP-Score: Detecting Off-Manifold Actions in Diffusion Policies
 
-**Candidate:** Neil Tripathi
-**Target:** Prof. Huijuan Xu, Vision-Language Lab
-
----
-
-## Problem Chosen: Detecting Off-Manifold Action Proposals in Visuomotor Imitation
-
-**Generalization Problem:** Imitation policies (e.g., diffusion policies) can drift without any built-in signal that their proposed actions no longer match expert behavior. We need a method to detect when action proposals fall off the expert manifold—enabling early failure prediction and potential intervention.
+**Author:** Neil Tripathi
 
 ---
 
-## Requirement 1: Identify SOTA Method
+## Overview
 
-**File:** `report/1_sota.md`
+An investigation into when and where intervention on Diffusion Policy (Chi et al., 2024) action proposals actually helps. Two main findings:
 
-**SOTA Identified:** Chi et al., "Diffusion Policy: Visuomotor Policy Learning via Action Diffusion" (RSS 2023)
+### 1. TAP-Score: Contrastive Failure Detection
+A contrastive scorer (InfoNCE) trained on expert demonstrations detects when a diffusion policy proposes off-manifold actions. AUROC 0.998 on held-out failure types, 94.3% TPR at 1% FPR, with early warning from the first 70% of an episode.
 
-- Achieves ~95% success rate on Push-T benchmark
-- Uses denoising diffusion for action generation
-- No built-in OOD detection or failure prediction
+### 2. Reranking Headroom Diagnosis
+A counterfactual branching framework ("label spread gate") that measures oracle best-of-K improvement *before* training any ranker. Key finding: **under clean conditions, there is nothing to rank** (+0.009 mean improvement). **Under degraded conditions (50% occlusion), headroom explodes 12x** (+0.109 mean improvement, 59% of decisions improvable).
 
----
-
-## Requirement 2: Replicate the Code
-
-**File:** `report/2_replication.md`
-
-**Status:** Partial replication (transparent documentation)
-
-| Step | Status |
-|------|--------|
-| Clone repository | Done (commit `5ba07ac`) |
-| Download Push-T data | Done (206 episodes) |
-| Verify data format | Done |
-| Train Diffusion Policy | Not done (resource constraints) |
-| Train TAP-Score on demos | Done |
-
-**Justification:** TAP-Score methodology requires expert demonstrations, not a trained policy checkpoint.
+The policy doesn't need help when it's succeeding — it needs a safety net when it's failing.
 
 ---
 
-## Requirement 3: Propose New Ideas
+## Key Results
 
-**File:** `report/3_ideas.md`
+### Reranking Headroom (the main finding)
 
-**Ideas Proposed:**
-1. **TAP-Score (Implemented):** Learn to score (obs, action) compatibility; detect off-manifold actions
-2. Phase-conditioned scoring for multi-stage tasks
-3. Uncertainty-weighted action selection
-4. Learned perturbation-invariant representations
+| Metric | Clean | 50% Occlusion | Change |
+|--------|-------|---------------|--------|
+| Mean oracle improvement | +0.009 | +0.109 | **12x** |
+| Median oracle improvement | ~0 | +0.027 | 0 to meaningful |
+| Frac > 0.01 | 11% | 59% | **5x** |
+| Frac > 0.1 | 1% | 35% | **28x** |
 
----
+This independently corroborates the memorization hypothesis (Chi et al., 2025): clean observations trigger reliable recall of memorized sequences (candidates converge); corrupted observations cause retrieval failure (candidates scatter).
 
-## Requirement 4: Implement One Specific Idea
-
-**File:** `report/4_method_and_results.md`
-
-### Method: Contrastive TAP-Score
-
-**Architecture:**
-- Observation encoder (CNN) → 128-dim features
-- Action encoder (MLP) → 128-dim features
-- Contrastive ranking with InfoNCE loss
-- Log-margin scoring: `margin = l_0 - logsumexp([l_1, ..., l_M])`
-
-**Key Innovation:** Train on (noise, permute, mirror, random) negatives, evaluate on held-out failure types (scaling, bias, stuck, delayed) to prove generalization.
-
-### Results
+### TAP-Score Detection
 
 | Metric | Value |
 |--------|-------|
-| **Held-Out Failure AUROC** | **0.998** |
-| **Prefix-Only AUROC** (early warning) | **0.997** |
-| **TPR @ 1% FPR** | **94.3%** |
-| **TPR @ 5% FPR** | **100.0%** |
-| Action Magnitude Baseline | 0.665 |
-| **TAP Advantage** | +0.333 absolute AUROC |
-
-### Key Findings
-
-1. **Generalization:** AUROC 0.998 on failure types never seen in training
-2. **Early warning:** Can predict failure using only first 70% of episode
-3. **Practical:** 94.3% detection at just 1% false alarm rate
-4. **Stable:** Consistent results across M=7, 15, 31 negatives
+| Held-Out Failure AUROC | 0.998 |
+| Prefix-Only AUROC | 0.997 |
+| TPR @ 1% FPR | 94.3% |
+| TPR @ 5% FPR | 100.0% |
 
 ---
 
-## Multi-Benchmark Support
-
-TAP-Score supports 4 benchmarks with different action dimensions:
-
-| Benchmark | Action Dim | Task |
-|-----------|------------|------|
-| `pusht` | 2 | Push T-block to target |
-| `lift` | 7 | Robomimic arm lifting |
-| `kitchen` | 9 | Kitchen manipulation |
-| `blockpush` | 2 | Block pushing |
+## Reproduction
 
 ```bash
-# Download all benchmarks
-./scripts/download_benchmarks.sh all
+# Setup
+./setup.sh
+./scripts/download_data.sh
 
-# Train on any benchmark
-python train_contrastive_tap.py --benchmark pusht
-python train_contrastive_tap.py --benchmark lift
-
-# Evaluate
-python eval_tap_final.py --benchmark pusht
-
-# Cross-benchmark comparison
-python scripts/eval_all_benchmarks.py
-```
-
----
-
-## Reproduction (Push-T)
-
-```bash
-# Train Contrastive TAP
+# Train TAP-Score
 python train_contrastive_tap.py --benchmark pusht
 
-# Evaluate with bulletproof metrics
+# Evaluate TAP-Score
 python eval_tap_final.py --benchmark pusht
 
-# View results
-cat eval_results/pusht_eval_results.json
+# Tier 0 baseline: vanilla DP clean vs perturbed (no TAP reranking)
+python scripts/reranking_experiment.py \
+  --dp_checkpoint baselines/diffusion_policy/data/checkpoints/pusht_image_latest.ckpt \
+  --K 1 --L 5 --n_episodes 200 --seed_offset 0 --perturb_seed 123 \
+  --output outputs/baseline_clean_n200.json
+python scripts/reranking_experiment.py \
+  --dp_checkpoint baselines/diffusion_policy/data/checkpoints/pusht_image_latest.ckpt \
+  --K 1 --L 5 --n_episodes 200 --seed_offset 0 \
+  --perturb occlusion --patch_size 24 --perturb_prob 0.5 --perturb_seed 123 \
+  --output outputs/baseline_occ24_n200.json
+python scripts/compare_tier0_baseline.py \
+  --clean outputs/baseline_clean_n200.json \
+  --perturbed outputs/baseline_occ24_n200.json \
+  --output outputs/baseline_tier0_compare.json
+
+# Headroom diagnostic (clean)
+python scripts/headroom_diagnostic.py \
+  --dp_checkpoint baselines/diffusion_policy/data/checkpoints/pusht_image_latest.ckpt \
+  --n_episodes 20 --K 8 --L 5 --device cuda
+
+# Headroom diagnostic (occluded — the key contrast)
+python scripts/headroom_diagnostic.py \
+  --dp_checkpoint baselines/diffusion_policy/data/checkpoints/pusht_image_latest.ckpt \
+  --n_episodes 20 --K 8 --L 5 --perturb occlusion --perturb_prob 0.5 --device cuda
 ```
 
 ---
@@ -133,55 +86,28 @@ cat eval_results/pusht_eval_results.json
 ## Project Structure
 
 ```
-pennstate-project/
-├── report/
-│   ├── 1_sota.md              # Req 1: SOTA identification
-│   ├── 2_replication.md       # Req 2: Partial replication (transparent)
-│   ├── 3_ideas.md             # Req 3: Proposed ideas
-│   └── 4_method_and_results.md # Req 4: TAP-Score implementation
-├── tap/
-│   ├── contrastive.py         # Contrastive TAP model
-│   └── ...
-├── train_contrastive_tap.py   # Training script
-├── eval_tap_final.py          # Bulletproof evaluation
-├── plot_score_trace.py        # Visualization script
-├── results/
-│   ├── final_eval_results.json
-│   └── figures/score_trace.png
-├── checkpoints_contrastive/   # Trained model
-├── baselines/
-│   └── diffusion_policy/      # Official repo (cloned)
-├── data/
-│   └── processed/pusht/       # Push-T demonstrations
-└── README.md
+├── tap/                        # Core TAP-Score implementation
+│   ├── contrastive.py          # Contrastive model (InfoNCE)
+│   ├── dataset.py              # Positive/negative sampling
+│   ├── benchmarks.py           # Multi-benchmark registry
+│   ├── env_wrapper.py          # State save/restore for counterfactual branching
+│   └── data_loaders.py         # Zarr/NPY loading
+├── scripts/
+│   ├── headroom_diagnostic.py  # Label spread gate + oracle best-of-K
+│   ├── label_spread_gate.py    # K/L sweep diagnostic
+│   └── test_state_restore.py   # Determinism verification
+├── train_contrastive_tap.py    # Training
+├── eval_tap_final.py           # Evaluation
+├── eval_results/               # All experimental results (JSON)
+├── papers/                     # Paper drafts
+│   └── paper_b_reranking_headroom.md
+└── tweets/                     # Social media materials
+    └── reranking_headroom/
 ```
 
 ---
 
-## Quick Setup
+## References
 
-```bash
-# 1. Setup environment
-./setup.sh
-
-# 2. Download Push-T data
-./scripts/download_data.sh
-
-# 3. (Optional) Clone Diffusion Policy baseline
-./scripts/run_replication.sh
-```
-
----
-
-## Talk Track (1 minute)
-
-> "Imitation policies like diffusion policies can drift without any built-in signal that their proposed actions no longer match expert behavior. I built **Contrastive TAP-Score**, a temporal action-proposal scorer that learns observation-action compatibility from demonstrations. The key change was switching from BCE to contrastive ranking so the model must rank the expert-consistent action above many plausible but incorrect alternatives. I score proposals with a numerically stable log-margin, which enables clean calibration and operating points. On Push-T demos with held-out off-manifold failure families not used in training (scaling, bias, stuck, delayed), TAP predicts failure early with **AUROC 0.998** and prefix-only **AUROC 0.997**, achieving **94.3% TPR at 1% FPR** and remaining stable across negative-set sizes. It also outperforms simple action-stat baselines by **+0.33 AUROC**."
-
----
-
-## Connection to Prof. Xu's Research
-
-1. **Temporal action understanding** - TAP-Score learns action structure over time
-2. **Weak supervision** - No manual OOD labels, just expert demos
-3. **Video-level reasoning** - Observation windows, not single frames
-4. **Practical robustness** - Closed-loop intervention, not just detection
+- Chi et al. (2024). Diffusion Policy: Visuomotor Policy Learning via Action Score Gradients. *RSS 2024*.
+- Chi et al. (2025). Demystifying Diffusion Policy. *arXiv*.
