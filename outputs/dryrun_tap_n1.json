@@ -1,0 +1,254 @@
+{
+  "config": {
+    "K": 8,
+    "L": 5,
+    "n_episodes": 1,
+    "decision_interval": 5,
+    "skip_first": 2,
+    "perturb": "occlusion",
+    "perturb_prob": 0.2,
+    "patch_size": 20,
+    "perturb_seed": 123,
+    "occlusion_mode": "episode",
+    "use_tap": true,
+    "tap_sees_perturb": false,
+    "tap_checkpoint": "checkpoints_contrastive/pusht/contrastive_tap_h8_best.pt",
+    "tap_config": "checkpoints_contrastive/pusht/config.json",
+    "perturb_seed_formula_decision": "perturb_seed + seed*10000 + policy_step",
+    "perturb_seed_formula_continuation_base": "perturb_seed + seed*10000 + policy_step*100",
+    "reward_metric": "max_step_reward_over_candidate_chunk_plus_continuation"
+  },
+  "summary": {
+    "n_decision_points": 5,
+    "n_with_headroom": 1,
+    "changed_frac": 1.0,
+    "mean_reward_notap": 0.4303305217983321,
+    "mean_reward_tap": 0.35527228948675865,
+    "mean_reward_oracle": 0.4346606598545824,
+    "mean_max_step_reward_notap": 0.4303305217983321,
+    "mean_max_step_reward_tap": 0.35527228948675865,
+    "mean_max_step_reward_oracle": 0.4346606598545824,
+    "mean_tap_gain": -0.07505823231157344,
+    "mean_headroom": 0.004330138056250344,
+    "mean_capture_ratio": 0.0,
+    "median_capture_ratio": 0.0,
+    "tap_picks_oracle_frac": 0.2,
+    "tap_beats_baseline_frac": 0.0,
+    "tap_harms_frac": 0.2,
+    "net_benefit": -1
+  },
+  "episode_summary": {
+    "n_episodes": 1,
+    "n_with_headroom": 1,
+    "n_rescued": 0,
+    "mean_episode_reward_notap": 0.4303305217983321,
+    "mean_episode_reward_tap": 0.35527228948675865,
+    "mean_episode_reward_oracle": 0.4346606598545824,
+    "mean_episode_reward_notap_ci95": {
+      "mean": 0.4303305217983321,
+      "ci95_low": 0.4303305217983321,
+      "ci95_high": 0.4303305217983321,
+      "n": 1
+    },
+    "mean_episode_reward_tap_ci95": {
+      "mean": 0.35527228948675865,
+      "ci95_low": 0.35527228948675865,
+      "ci95_high": 0.35527228948675865,
+      "n": 1
+    },
+    "mean_episode_reward_oracle_ci95": {
+      "mean": 0.4346606598545824,
+      "ci95_low": 0.4346606598545824,
+      "ci95_high": 0.4346606598545824,
+      "n": 1
+    },
+    "mean_episode_lift": -0.07505823231157344,
+    "mean_episode_headroom": 0.004330138056250321,
+    "mean_episode_capture_ratio": 0.0
+  },
+  "episodes": [
+    {
+      "episode": 0,
+      "seed": 0,
+      "n_decision_points": 5,
+      "mean_reward_notap": 0.4303305217983321,
+      "mean_reward_tap": 0.35527228948675865,
+      "mean_reward_oracle": 0.4346606598545824,
+      "max_reward_notap": 0.5095790002726491,
+      "max_reward_tap": 0.5094945728681465,
+      "max_reward_oracle": 0.5105793289047417,
+      "mean_lift": -0.07505823231157344,
+      "mean_headroom": 0.004330138056250321,
+      "max_lift": -8.442740450265163e-05,
+      "max_headroom": 0.0010003286320925397,
+      "changed_frac": 1.0
+    }
+  ],
+  "decision_points": [
+    {
+      "episode": 0,
+      "seed": 0,
+      "policy_step": 2,
+      "env_steps": 16,
+      "n_contacts": 0,
+      "rewards_k": [
+        0.48662093969069403,
+        0.4864636813603249,
+        0.4864876323868497,
+        0.4864365653204169,
+        0.48652353831450873,
+        0.48664273705215166,
+        0.48660950170241557,
+        0.48657997974184153
+      ],
+      "tap_scores": [
+        4.055102348327637,
+        4.046005725860596,
+        4.073116779327393,
+        4.04172420501709,
+        4.0802202224731445,
+        4.055625915527344,
+        4.067604064941406,
+        4.070276260375977
+      ],
+      "tap_pick": 4,
+      "reward_notap": 0.48662093969069403,
+      "reward_tap": 0.48652353831450873,
+      "reward_oracle": 0.48664273705215166,
+      "reward_spread": 0.0002061717317347611,
+      "tap_obs_source": "clean"
+    },
+    {
+      "episode": 0,
+      "seed": 0,
+      "policy_step": 7,
+      "env_steps": 56,
+      "n_contacts": 0,
+      "rewards_k": [
+        0.4593258897737933,
+        0.45942018150294023,
+        0.45925524509392335,
+        0.4594587188255166,
+        0.45935357413350403,
+        0.4593978750254883,
+        0.45932012348335804,
+        0.45934312067265526
+      ],
+      "tap_scores": [
+        2.83178448677063,
+        2.9671523571014404,
+        2.9220409393310547,
+        2.8034443855285645,
+        2.9974281787872314,
+        2.9476146697998047,
+        2.8870396614074707,
+        3.059678077697754
+      ],
+      "tap_pick": 7,
+      "reward_notap": 0.4593258897737933,
+      "reward_tap": 0.45934312067265526,
+      "reward_oracle": 0.4594587188255166,
+      "reward_spread": 0.00020347373159324,
+      "tap_obs_source": "clean"
+    },
+    {
+      "episode": 0,
+      "seed": 0,
+      "policy_step": 12,
+      "env_steps": 96,
+      "n_contacts": 10,
+      "rewards_k": [
+        0.489389679003775,
+        0.11382865655665987,
+        0.5105793289047417,
+        0.11387826440989213,
+        0.4801327909141659,
+        0.11396080461724716,
+        0.11399547337258684,
+        0.5068709207427767
+      ],
+      "tap_scores": [
+        3.256168842315674,
+        3.2407684326171875,
+        3.235771656036377,
+        3.232360363006592,
+        3.246450185775757,
+        3.2161402702331543,
+        3.260866403579712,
+        3.2327044010162354
+      ],
+      "tap_pick": 6,
+      "reward_notap": 0.489389679003775,
+      "reward_tap": 0.11399547337258684,
+      "reward_oracle": 0.5105793289047417,
+      "reward_spread": 0.3967506723480818,
+      "tap_obs_source": "clean"
+    },
+    {
+      "episode": 0,
+      "seed": 0,
+      "policy_step": 17,
+      "env_steps": 136,
+      "n_contacts": 10,
+      "rewards_k": [
+        0.5095790002726491,
+        0.5095215976592934,
+        0.5094659410329848,
+        0.5096177722846063,
+        0.509529008261571,
+        0.5094122811379131,
+        0.5094377284556221,
+        0.5094945728681465
+      ],
+      "tap_scores": [
+        3.666801929473877,
+        3.672112226486206,
+        3.663158416748047,
+        3.645474672317505,
+        3.6425833702087402,
+        3.661189556121826,
+        3.6665267944335938,
+        3.679368495941162
+      ],
+      "tap_pick": 7,
+      "reward_notap": 0.5095790002726491,
+      "reward_tap": 0.5094945728681465,
+      "reward_oracle": 0.5096177722846063,
+      "reward_spread": 0.0002054911466931042,
+      "tap_obs_source": "clean"
+    },
+    {
+      "episode": 0,
+      "seed": 0,
+      "policy_step": 22,
+      "env_steps": 176,
+      "n_contacts": 0,
+      "rewards_k": [
+        0.20673710025074882,
+        0.206900940737663,
+        0.20677703668546693,
+        0.2069195260701702,
+        0.20664121640456873,
+        0.20700474220589582,
+        0.20661337911205666,
+        0.2067062169721399
+      ],
+      "tap_scores": [
+        3.6229519844055176,
+        3.572338581085205,
+        3.5947518348693848,
+        3.5902514457702637,
+        3.589110851287842,
+        3.6373302936553955,
+        3.5688085556030273,
+        3.627668857574463
+      ],
+      "tap_pick": 5,
+      "reward_notap": 0.20673710025074882,
+      "reward_tap": 0.20700474220589582,
+      "reward_oracle": 0.20700474220589582,
+      "reward_spread": 0.00039136309383916434,
+      "tap_obs_source": "clean"
+    }
+  ]
+}

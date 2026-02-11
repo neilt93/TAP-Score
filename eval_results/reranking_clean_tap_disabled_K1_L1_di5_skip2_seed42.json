@@ -1,0 +1,1970 @@
+{
+  "config": {
+    "K": 1,
+    "L": 1,
+    "n_episodes": 20,
+    "decision_interval": 5,
+    "skip_first": 2,
+    "perturb": null,
+    "perturb_prob": 0.5,
+    "patch_size": 24,
+    "perturb_seed": 42,
+    "occlusion_mode": "step",
+    "use_tap": false,
+    "tap_sees_perturb": false,
+    "tap_checkpoint": null,
+    "tap_config": null,
+    "perturb_seed_formula_decision": "perturb_seed + seed*10000 + policy_step",
+    "perturb_seed_formula_continuation_base": "perturb_seed + seed*10000 + policy_step*100",
+    "reward_metric": "max_step_reward_over_candidate_chunk_plus_continuation"
+  },
+  "summary": {
+    "n_decision_points": 83,
+    "n_with_headroom": 0,
+    "changed_frac": 0.0,
+    "mean_reward_notap": 0.34984585820449293,
+    "mean_reward_tap": 0.34984585820449293,
+    "mean_reward_oracle": 0.34984585820449293,
+    "mean_max_step_reward_notap": 0.34984585820449293,
+    "mean_max_step_reward_tap": 0.34984585820449293,
+    "mean_max_step_reward_oracle": 0.34984585820449293,
+    "mean_tap_gain": 0.0,
+    "mean_headroom": 0.0,
+    "mean_capture_ratio": 0.0,
+    "median_capture_ratio": 0.0,
+    "tap_picks_oracle_frac": 1.0,
+    "tap_beats_baseline_frac": 0.0,
+    "tap_harms_frac": 0.0,
+    "net_benefit": 0
+  },
+  "episode_summary": {
+    "n_episodes": 20,
+    "n_with_headroom": 0,
+    "n_rescued": 0,
+    "mean_episode_reward_notap": 0.36828859762339583,
+    "mean_episode_reward_tap": 0.36828859762339583,
+    "mean_episode_reward_oracle": 0.36828859762339583,
+    "mean_episode_reward_notap_ci95": {
+      "mean": 0.36828859762339583,
+      "ci95_low": 0.26937045427087847,
+      "ci95_high": 0.4672067409759132,
+      "n": 20
+    },
+    "mean_episode_reward_tap_ci95": {
+      "mean": 0.36828859762339583,
+      "ci95_low": 0.26937045427087847,
+      "ci95_high": 0.4672067409759132,
+      "n": 20
+    },
+    "mean_episode_reward_oracle_ci95": {
+      "mean": 0.36828859762339583,
+      "ci95_low": 0.26937045427087847,
+      "ci95_high": 0.4672067409759132,
+      "n": 20
+    },
+    "mean_episode_lift": 0.0,
+    "mean_episode_headroom": 0.0,
+    "mean_episode_capture_ratio": 0.0
+  },
+  "episodes": [
+    {
+      "episode": 0,
+      "seed": 0,
+      "n_decision_points": 5,
+      "mean_reward_notap": 0.402736736440755,
+      "mean_reward_tap": 0.402736736440755,
+      "mean_reward_oracle": 0.402736736440755,
+      "max_reward_notap": 0.8442126271623147,
+      "max_reward_tap": 0.8442126271623147,
+      "max_reward_oracle": 0.8442126271623147,
+      "mean_lift": 0.0,
+      "mean_headroom": 0.0,
+      "max_lift": 0.0,
+      "max_headroom": 0.0,
+      "changed_frac": 0.0
+    },
+    {
+      "episode": 1,
+      "seed": 1,
+      "n_decision_points": 5,
+      "mean_reward_notap": 0.5552396473906767,
+      "mean_reward_tap": 0.5552396473906767,
+      "mean_reward_oracle": 0.5552396473906767,
+      "max_reward_notap": 0.9743321240532068,
+      "max_reward_tap": 0.9743321240532068,
+      "max_reward_oracle": 0.9743321240532068,
+      "mean_lift": 0.0,
+      "mean_headroom": 0.0,
+      "max_lift": 0.0,
+      "max_headroom": 0.0,
+      "changed_frac": 0.0
+    },
+    {
+      "episode": 2,
+      "seed": 2,
+      "n_decision_points": 5,
+      "mean_reward_notap": 0.0,
+      "mean_reward_tap": 0.0,
+      "mean_reward_oracle": 0.0,
+      "max_reward_notap": 0.0,
+      "max_reward_tap": 0.0,
+      "max_reward_oracle": 0.0,
+      "mean_lift": 0.0,
+      "mean_headroom": 0.0,
+      "max_lift": 0.0,
+      "max_headroom": 0.0,
+      "changed_frac": 0.0
+    },
+    {
+      "episode": 3,
+      "seed": 3,
+      "n_decision_points": 5,
+      "mean_reward_notap": 0.30698856900414995,
+      "mean_reward_tap": 0.30698856900414995,
+      "mean_reward_oracle": 0.30698856900414995,
+      "max_reward_notap": 0.8951793622541615,
+      "max_reward_tap": 0.8951793622541615,
+      "max_reward_oracle": 0.8951793622541615,
+      "mean_lift": 0.0,
+      "mean_headroom": 0.0,
+      "max_lift": 0.0,
+      "max_headroom": 0.0,
+      "changed_frac": 0.0
+    },
+    {
+      "episode": 4,
+      "seed": 4,
+      "n_decision_points": 2,
+      "mean_reward_notap": 0.35578959457080883,
+      "mean_reward_tap": 0.35578959457080883,
+      "mean_reward_oracle": 0.35578959457080883,
+      "max_reward_notap": 0.555134525649345,
+      "max_reward_tap": 0.555134525649345,
+      "max_reward_oracle": 0.555134525649345,
+      "mean_lift": 0.0,
+      "mean_headroom": 0.0,
+      "max_lift": 0.0,
+      "max_headroom": 0.0,
+      "changed_frac": 0.0
+    },
+    {
+      "episode": 5,
+      "seed": 5,
+      "n_decision_points": 2,
+      "mean_reward_notap": 0.47532129519046545,
+      "mean_reward_tap": 0.47532129519046545,
+      "mean_reward_oracle": 0.47532129519046545,
+      "max_reward_notap": 0.5599350761365676,
+      "max_reward_tap": 0.5599350761365676,
+      "max_reward_oracle": 0.5599350761365676,
+      "mean_lift": 0.0,
+      "mean_headroom": 0.0,
+      "max_lift": 0.0,
+      "max_headroom": 0.0,
+      "changed_frac": 0.0
+    },
+    {
+      "episode": 6,
+      "seed": 6,
+      "n_decision_points": 4,
+      "mean_reward_notap": 0.5762830908421321,
+      "mean_reward_tap": 0.5762830908421321,
+      "mean_reward_oracle": 0.5762830908421321,
+      "max_reward_notap": 1.0,
+      "max_reward_tap": 1.0,
+      "max_reward_oracle": 1.0,
+      "mean_lift": 0.0,
+      "mean_headroom": 0.0,
+      "max_lift": 0.0,
+      "max_headroom": 0.0,
+      "changed_frac": 0.0
+    },
+    {
+      "episode": 7,
+      "seed": 7,
+      "n_decision_points": 5,
+      "mean_reward_notap": 0.0,
+      "mean_reward_tap": 0.0,
+      "mean_reward_oracle": 0.0,
+      "max_reward_notap": 0.0,
+      "max_reward_tap": 0.0,
+      "max_reward_oracle": 0.0,
+      "mean_lift": 0.0,
+      "mean_headroom": 0.0,
+      "max_lift": 0.0,
+      "max_headroom": 0.0,
+      "changed_frac": 0.0
+    },
+    {
+      "episode": 8,
+      "seed": 8,
+      "n_decision_points": 5,
+      "mean_reward_notap": 0.29061978017950796,
+      "mean_reward_tap": 0.29061978017950796,
+      "mean_reward_oracle": 0.29061978017950796,
+      "max_reward_notap": 0.40188519731550826,
+      "max_reward_tap": 0.40188519731550826,
+      "max_reward_oracle": 0.40188519731550826,
+      "mean_lift": 0.0,
+      "mean_headroom": 0.0,
+      "max_lift": 0.0,
+      "max_headroom": 0.0,
+      "changed_frac": 0.0
+    },
+    {
+      "episode": 9,
+      "seed": 9,
+      "n_decision_points": 3,
+      "mean_reward_notap": 0.45161146581256784,
+      "mean_reward_tap": 0.45161146581256784,
+      "mean_reward_oracle": 0.45161146581256784,
+      "max_reward_notap": 1.0,
+      "max_reward_tap": 1.0,
+      "max_reward_oracle": 1.0,
+      "mean_lift": 0.0,
+      "mean_headroom": 0.0,
+      "max_lift": 0.0,
+      "max_headroom": 0.0,
+      "changed_frac": 0.0
+    },
+    {
+      "episode": 10,
+      "seed": 10,
+      "n_decision_points": 5,
+      "mean_reward_notap": 0.4937491878809698,
+      "mean_reward_tap": 0.4937491878809698,
+      "mean_reward_oracle": 0.4937491878809698,
+      "max_reward_notap": 0.9418620952953717,
+      "max_reward_tap": 0.9418620952953717,
+      "max_reward_oracle": 0.9418620952953717,
+      "mean_lift": 0.0,
+      "mean_headroom": 0.0,
+      "max_lift": 0.0,
+      "max_headroom": 0.0,
+      "changed_frac": 0.0
+    },
+    {
+      "episode": 11,
+      "seed": 11,
+      "n_decision_points": 5,
+      "mean_reward_notap": 0.6297564213311337,
+      "mean_reward_tap": 0.6297564213311337,
+      "mean_reward_oracle": 0.6297564213311337,
+      "max_reward_notap": 0.9875991679838999,
+      "max_reward_tap": 0.9875991679838999,
+      "max_reward_oracle": 0.9875991679838999,
+      "mean_lift": 0.0,
+      "mean_headroom": 0.0,
+      "max_lift": 0.0,
+      "max_headroom": 0.0,
+      "changed_frac": 0.0
+    },
+    {
+      "episode": 12,
+      "seed": 12,
+      "n_decision_points": 3,
+      "mean_reward_notap": 0.46262461262728855,
+      "mean_reward_tap": 0.46262461262728855,
+      "mean_reward_oracle": 0.46262461262728855,
+      "max_reward_notap": 0.8540575018535115,
+      "max_reward_tap": 0.8540575018535115,
+      "max_reward_oracle": 0.8540575018535115,
+      "mean_lift": 0.0,
+      "mean_headroom": 0.0,
+      "max_lift": 0.0,
+      "max_headroom": 0.0,
+      "changed_frac": 0.0
+    },
+    {
+      "episode": 13,
+      "seed": 13,
+      "n_decision_points": 5,
+      "mean_reward_notap": 0.0,
+      "mean_reward_tap": 0.0,
+      "mean_reward_oracle": 0.0,
+      "max_reward_notap": 0.0,
+      "max_reward_tap": 0.0,
+      "max_reward_oracle": 0.0,
+      "mean_lift": 0.0,
+      "mean_headroom": 0.0,
+      "max_lift": 0.0,
+      "max_headroom": 0.0,
+      "changed_frac": 0.0
+    },
+    {
+      "episode": 14,
+      "seed": 14,
+      "n_decision_points": 5,
+      "mean_reward_notap": 0.0,
+      "mean_reward_tap": 0.0,
+      "mean_reward_oracle": 0.0,
+      "max_reward_notap": 0.0,
+      "max_reward_tap": 0.0,
+      "max_reward_oracle": 0.0,
+      "mean_lift": 0.0,
+      "mean_headroom": 0.0,
+      "max_lift": 0.0,
+      "max_headroom": 0.0,
+      "changed_frac": 0.0
+    },
+    {
+      "episode": 15,
+      "seed": 15,
+      "n_decision_points": 5,
+      "mean_reward_notap": 0.2474599034796781,
+      "mean_reward_tap": 0.2474599034796781,
+      "mean_reward_oracle": 0.2474599034796781,
+      "max_reward_notap": 0.33683802782299443,
+      "max_reward_tap": 0.33683802782299443,
+      "max_reward_oracle": 0.33683802782299443,
+      "mean_lift": 0.0,
+      "mean_headroom": 0.0,
+      "max_lift": 0.0,
+      "max_headroom": 0.0,
+      "changed_frac": 0.0
+    },
+    {
+      "episode": 16,
+      "seed": 16,
+      "n_decision_points": 5,
+      "mean_reward_notap": 0.42556012598743287,
+      "mean_reward_tap": 0.42556012598743287,
+      "mean_reward_oracle": 0.42556012598743287,
+      "max_reward_notap": 0.9874870618816582,
+      "max_reward_tap": 0.9874870618816582,
+      "max_reward_oracle": 0.9874870618816582,
+      "mean_lift": 0.0,
+      "mean_headroom": 0.0,
+      "max_lift": 0.0,
+      "max_headroom": 0.0,
+      "changed_frac": 0.0
+    },
+    {
+      "episode": 17,
+      "seed": 17,
+      "n_decision_points": 2,
+      "mean_reward_notap": 0.3214968245973947,
+      "mean_reward_tap": 0.3214968245973947,
+      "mean_reward_oracle": 0.3214968245973947,
+      "max_reward_notap": 0.5031031841976397,
+      "max_reward_tap": 0.5031031841976397,
+      "max_reward_oracle": 0.5031031841976397,
+      "mean_lift": 0.0,
+      "mean_headroom": 0.0,
+      "max_lift": 0.0,
+      "max_headroom": 0.0,
+      "changed_frac": 0.0
+    },
+    {
+      "episode": 18,
+      "seed": 18,
+      "n_decision_points": 5,
+      "mean_reward_notap": 0.7275096502766812,
+      "mean_reward_tap": 0.7275096502766812,
+      "mean_reward_oracle": 0.7275096502766812,
+      "max_reward_notap": 0.9917585559698994,
+      "max_reward_tap": 0.9917585559698994,
+      "max_reward_oracle": 0.9917585559698994,
+      "mean_lift": 0.0,
+      "mean_headroom": 0.0,
+      "max_lift": 0.0,
+      "max_headroom": 0.0,
+      "changed_frac": 0.0
+    },
+    {
+      "episode": 19,
+      "seed": 19,
+      "n_decision_points": 2,
+      "mean_reward_notap": 0.6430250468562739,
+      "mean_reward_tap": 0.6430250468562739,
+      "mean_reward_oracle": 0.6430250468562739,
+      "max_reward_notap": 0.9042740983237202,
+      "max_reward_tap": 0.9042740983237202,
+      "max_reward_oracle": 0.9042740983237202,
+      "mean_lift": 0.0,
+      "mean_headroom": 0.0,
+      "max_lift": 0.0,
+      "max_headroom": 0.0,
+      "changed_frac": 0.0
+    }
+  ],
+  "decision_points": [
+    {
+      "episode": 0,
+      "seed": 0,
+      "policy_step": 2,
+      "env_steps": 16,
+      "n_contacts": 0,
+      "rewards_k": [
+        0.4866215137653599
+      ],
+      "tap_scores": [
+        0.0
+      ],
+      "tap_pick": 0,
+      "reward_notap": 0.4866215137653599,
+      "reward_tap": 0.4866215137653599,
+      "reward_oracle": 0.4866215137653599,
+      "reward_spread": 0.0,
+      "tap_obs_source": "disabled"
+    },
+    {
+      "episode": 0,
+      "seed": 0,
+      "policy_step": 7,
+      "env_steps": 56,
+      "n_contacts": 0,
+      "rewards_k": [
+        0.0925524498652595
+      ],
+      "tap_scores": [
+        0.0
+      ],
+      "tap_pick": 0,
+      "reward_notap": 0.0925524498652595,
+      "reward_tap": 0.0925524498652595,
+      "reward_oracle": 0.0925524498652595,
+      "reward_spread": 0.0,
+      "tap_obs_source": "disabled"
+    },
+    {
+      "episode": 0,
+      "seed": 0,
+      "policy_step": 12,
+      "env_steps": 96,
+      "n_contacts": 0,
+      "rewards_k": [
+        0.23583832862619394
+      ],
+      "tap_scores": [
+        0.0
+      ],
+      "tap_pick": 0,
+      "reward_notap": 0.23583832862619394,
+      "reward_tap": 0.23583832862619394,
+      "reward_oracle": 0.23583832862619394,
+      "reward_spread": 0.0,
+      "tap_obs_source": "disabled"
+    },
+    {
+      "episode": 0,
+      "seed": 0,
+      "policy_step": 17,
+      "env_steps": 136,
+      "n_contacts": 0,
+      "rewards_k": [
+        0.35445876278464716
+      ],
+      "tap_scores": [
+        0.0
+      ],
+      "tap_pick": 0,
+      "reward_notap": 0.35445876278464716,
+      "reward_tap": 0.35445876278464716,
+      "reward_oracle": 0.35445876278464716,
+      "reward_spread": 0.0,
+      "tap_obs_source": "disabled"
+    },
+    {
+      "episode": 0,
+      "seed": 0,
+      "policy_step": 22,
+      "env_steps": 176,
+      "n_contacts": 0,
+      "rewards_k": [
+        0.8442126271623147
+      ],
+      "tap_scores": [
+        0.0
+      ],
+      "tap_pick": 0,
+      "reward_notap": 0.8442126271623147,
+      "reward_tap": 0.8442126271623147,
+      "reward_oracle": 0.8442126271623147,
+      "reward_spread": 0.0,
+      "tap_obs_source": "disabled"
+    },
+    {
+      "episode": 1,
+      "seed": 1,
+      "policy_step": 2,
+      "env_steps": 16,
+      "n_contacts": 0,
+      "rewards_k": [
+        0.01744116820156687
+      ],
+      "tap_scores": [
+        0.0
+      ],
+      "tap_pick": 0,
+      "reward_notap": 0.01744116820156687,
+      "reward_tap": 0.01744116820156687,
+      "reward_oracle": 0.01744116820156687,
+      "reward_spread": 0.0,
+      "tap_obs_source": "disabled"
+    },
+    {
+      "episode": 1,
+      "seed": 1,
+      "policy_step": 7,
+      "env_steps": 56,
+      "n_contacts": 0,
+      "rewards_k": [
+        0.26210149590305176
+      ],
+      "tap_scores": [
+        0.0
+      ],
+      "tap_pick": 0,
+      "reward_notap": 0.26210149590305176,
+      "reward_tap": 0.26210149590305176,
+      "reward_oracle": 0.26210149590305176,
+      "reward_spread": 0.0,
+      "tap_obs_source": "disabled"
+    },
+    {
+      "episode": 1,
+      "seed": 1,
+      "policy_step": 12,
+      "env_steps": 96,
+      "n_contacts": 0,
+      "rewards_k": [
+        0.5591775779217658
+      ],
+      "tap_scores": [
+        0.0
+      ],
+      "tap_pick": 0,
+      "reward_notap": 0.5591775779217658,
+      "reward_tap": 0.5591775779217658,
+      "reward_oracle": 0.5591775779217658,
+      "reward_spread": 0.0,
+      "tap_obs_source": "disabled"
+    },
+    {
+      "episode": 1,
+      "seed": 1,
+      "policy_step": 17,
+      "env_steps": 136,
+      "n_contacts": 5,
+      "rewards_k": [
+        0.963145870873792
+      ],
+      "tap_scores": [
+        0.0
+      ],
+      "tap_pick": 0,
+      "reward_notap": 0.963145870873792,
+      "reward_tap": 0.963145870873792,
+      "reward_oracle": 0.963145870873792,
+      "reward_spread": 0.0,
+      "tap_obs_source": "disabled"
+    },
+    {
+      "episode": 1,
+      "seed": 1,
+      "policy_step": 22,
+      "env_steps": 176,
+      "n_contacts": 0,
+      "rewards_k": [
+        0.9743321240532068
+      ],
+      "tap_scores": [
+        0.0
+      ],
+      "tap_pick": 0,
+      "reward_notap": 0.9743321240532068,
+      "reward_tap": 0.9743321240532068,
+      "reward_oracle": 0.9743321240532068,
+      "reward_spread": 0.0,
+      "tap_obs_source": "disabled"
+    },
+    {
+      "episode": 2,
+      "seed": 2,
+      "policy_step": 2,
+      "env_steps": 16,
+      "n_contacts": 19,
+      "rewards_k": [
+        0.0
+      ],
+      "tap_scores": [
+        0.0
+      ],
+      "tap_pick": 0,
+      "reward_notap": 0.0,
+      "reward_tap": 0.0,
+      "reward_oracle": 0.0,
+      "reward_spread": 0.0,
+      "tap_obs_source": "disabled"
+    },
+    {
+      "episode": 2,
+      "seed": 2,
+      "policy_step": 7,
+      "env_steps": 56,
+      "n_contacts": 10,
+      "rewards_k": [
+        0.0
+      ],
+      "tap_scores": [
+        0.0
+      ],
+      "tap_pick": 0,
+      "reward_notap": 0.0,
+      "reward_tap": 0.0,
+      "reward_oracle": 0.0,
+      "reward_spread": 0.0,
+      "tap_obs_source": "disabled"
+    },
+    {
+      "episode": 2,
+      "seed": 2,
+      "policy_step": 12,
+      "env_steps": 96,
+      "n_contacts": 10,
+      "rewards_k": [
+        0.0
+      ],
+      "tap_scores": [
+        0.0
+      ],
+      "tap_pick": 0,
+      "reward_notap": 0.0,
+      "reward_tap": 0.0,
+      "reward_oracle": 0.0,
+      "reward_spread": 0.0,
+      "tap_obs_source": "disabled"
+    },
+    {
+      "episode": 2,
+      "seed": 2,
+      "policy_step": 17,
+      "env_steps": 136,
+      "n_contacts": 0,
+      "rewards_k": [
+        0.0
+      ],
+      "tap_scores": [
+        0.0
+      ],
+      "tap_pick": 0,
+      "reward_notap": 0.0,
+      "reward_tap": 0.0,
+      "reward_oracle": 0.0,
+      "reward_spread": 0.0,
+      "tap_obs_source": "disabled"
+    },
+    {
+      "episode": 2,
+      "seed": 2,
+      "policy_step": 22,
+      "env_steps": 176,
+      "n_contacts": 0,
+      "rewards_k": [
+        0.0
+      ],
+      "tap_scores": [
+        0.0
+      ],
+      "tap_pick": 0,
+      "reward_notap": 0.0,
+      "reward_tap": 0.0,
+      "reward_oracle": 0.0,
+      "reward_spread": 0.0,
+      "tap_obs_source": "disabled"
+    },
+    {
+      "episode": 3,
+      "seed": 3,
+      "policy_step": 2,
+      "env_steps": 16,
+      "n_contacts": 10,
+      "rewards_k": [
+        0.0009981339224505775
+      ],
+      "tap_scores": [
+        0.0
+      ],
+      "tap_pick": 0,
+      "reward_notap": 0.0009981339224505775,
+      "reward_tap": 0.0009981339224505775,
+      "reward_oracle": 0.0009981339224505775,
+      "reward_spread": 0.0,
+      "tap_obs_source": "disabled"
+    },
+    {
+      "episode": 3,
+      "seed": 3,
+      "policy_step": 7,
+      "env_steps": 56,
+      "n_contacts": 0,
+      "rewards_k": [
+        0.005037754140059038
+      ],
+      "tap_scores": [
+        0.0
+      ],
+      "tap_pick": 0,
+      "reward_notap": 0.005037754140059038,
+      "reward_tap": 0.005037754140059038,
+      "reward_oracle": 0.005037754140059038,
+      "reward_spread": 0.0,
+      "tap_obs_source": "disabled"
+    },
+    {
+      "episode": 3,
+      "seed": 3,
+      "policy_step": 12,
+      "env_steps": 96,
+      "n_contacts": 10,
+      "rewards_k": [
+        0.3705651851578166
+      ],
+      "tap_scores": [
+        0.0
+      ],
+      "tap_pick": 0,
+      "reward_notap": 0.3705651851578166,
+      "reward_tap": 0.3705651851578166,
+      "reward_oracle": 0.3705651851578166,
+      "reward_spread": 0.0,
+      "tap_obs_source": "disabled"
+    },
+    {
+      "episode": 3,
+      "seed": 3,
+      "policy_step": 17,
+      "env_steps": 136,
+      "n_contacts": 10,
+      "rewards_k": [
+        0.263162409546262
+      ],
+      "tap_scores": [
+        0.0
+      ],
+      "tap_pick": 0,
+      "reward_notap": 0.263162409546262,
+      "reward_tap": 0.263162409546262,
+      "reward_oracle": 0.263162409546262,
+      "reward_spread": 0.0,
+      "tap_obs_source": "disabled"
+    },
+    {
+      "episode": 3,
+      "seed": 3,
+      "policy_step": 22,
+      "env_steps": 176,
+      "n_contacts": 10,
+      "rewards_k": [
+        0.8951793622541615
+      ],
+      "tap_scores": [
+        0.0
+      ],
+      "tap_pick": 0,
+      "reward_notap": 0.8951793622541615,
+      "reward_tap": 0.8951793622541615,
+      "reward_oracle": 0.8951793622541615,
+      "reward_spread": 0.0,
+      "tap_obs_source": "disabled"
+    },
+    {
+      "episode": 4,
+      "seed": 4,
+      "policy_step": 2,
+      "env_steps": 16,
+      "n_contacts": 9,
+      "rewards_k": [
+        0.1564446634922727
+      ],
+      "tap_scores": [
+        0.0
+      ],
+      "tap_pick": 0,
+      "reward_notap": 0.1564446634922727,
+      "reward_tap": 0.1564446634922727,
+      "reward_oracle": 0.1564446634922727,
+      "reward_spread": 0.0,
+      "tap_obs_source": "disabled"
+    },
+    {
+      "episode": 4,
+      "seed": 4,
+      "policy_step": 7,
+      "env_steps": 56,
+      "n_contacts": 0,
+      "rewards_k": [
+        0.555134525649345
+      ],
+      "tap_scores": [
+        0.0
+      ],
+      "tap_pick": 0,
+      "reward_notap": 0.555134525649345,
+      "reward_tap": 0.555134525649345,
+      "reward_oracle": 0.555134525649345,
+      "reward_spread": 0.0,
+      "tap_obs_source": "disabled"
+    },
+    {
+      "episode": 5,
+      "seed": 5,
+      "policy_step": 2,
+      "env_steps": 16,
+      "n_contacts": 9,
+      "rewards_k": [
+        0.39070751424436334
+      ],
+      "tap_scores": [
+        0.0
+      ],
+      "tap_pick": 0,
+      "reward_notap": 0.39070751424436334,
+      "reward_tap": 0.39070751424436334,
+      "reward_oracle": 0.39070751424436334,
+      "reward_spread": 0.0,
+      "tap_obs_source": "disabled"
+    },
+    {
+      "episode": 5,
+      "seed": 5,
+      "policy_step": 7,
+      "env_steps": 56,
+      "n_contacts": 0,
+      "rewards_k": [
+        0.5599350761365676
+      ],
+      "tap_scores": [
+        0.0
+      ],
+      "tap_pick": 0,
+      "reward_notap": 0.5599350761365676,
+      "reward_tap": 0.5599350761365676,
+      "reward_oracle": 0.5599350761365676,
+      "reward_spread": 0.0,
+      "tap_obs_source": "disabled"
+    },
+    {
+      "episode": 6,
+      "seed": 6,
+      "policy_step": 2,
+      "env_steps": 16,
+      "n_contacts": 0,
+      "rewards_k": [
+        0.16776150772634996
+      ],
+      "tap_scores": [
+        0.0
+      ],
+      "tap_pick": 0,
+      "reward_notap": 0.16776150772634996,
+      "reward_tap": 0.16776150772634996,
+      "reward_oracle": 0.16776150772634996,
+      "reward_spread": 0.0,
+      "tap_obs_source": "disabled"
+    },
+    {
+      "episode": 6,
+      "seed": 6,
+      "policy_step": 7,
+      "env_steps": 56,
+      "n_contacts": 0,
+      "rewards_k": [
+        0.2157382144322979
+      ],
+      "tap_scores": [
+        0.0
+      ],
+      "tap_pick": 0,
+      "reward_notap": 0.2157382144322979,
+      "reward_tap": 0.2157382144322979,
+      "reward_oracle": 0.2157382144322979,
+      "reward_spread": 0.0,
+      "tap_obs_source": "disabled"
+    },
+    {
+      "episode": 6,
+      "seed": 6,
+      "policy_step": 12,
+      "env_steps": 96,
+      "n_contacts": 10,
+      "rewards_k": [
+        0.9216326412098805
+      ],
+      "tap_scores": [
+        0.0
+      ],
+      "tap_pick": 0,
+      "reward_notap": 0.9216326412098805,
+      "reward_tap": 0.9216326412098805,
+      "reward_oracle": 0.9216326412098805,
+      "reward_spread": 0.0,
+      "tap_obs_source": "disabled"
+    },
+    {
+      "episode": 6,
+      "seed": 6,
+      "policy_step": 17,
+      "env_steps": 136,
+      "n_contacts": 0,
+      "rewards_k": [
+        1.0
+      ],
+      "tap_scores": [
+        0.0
+      ],
+      "tap_pick": 0,
+      "reward_notap": 1.0,
+      "reward_tap": 1.0,
+      "reward_oracle": 1.0,
+      "reward_spread": 0.0,
+      "tap_obs_source": "disabled"
+    },
+    {
+      "episode": 7,
+      "seed": 7,
+      "policy_step": 2,
+      "env_steps": 16,
+      "n_contacts": 0,
+      "rewards_k": [
+        0.0
+      ],
+      "tap_scores": [
+        0.0
+      ],
+      "tap_pick": 0,
+      "reward_notap": 0.0,
+      "reward_tap": 0.0,
+      "reward_oracle": 0.0,
+      "reward_spread": 0.0,
+      "tap_obs_source": "disabled"
+    },
+    {
+      "episode": 7,
+      "seed": 7,
+      "policy_step": 7,
+      "env_steps": 56,
+      "n_contacts": 0,
+      "rewards_k": [
+        0.0
+      ],
+      "tap_scores": [
+        0.0
+      ],
+      "tap_pick": 0,
+      "reward_notap": 0.0,
+      "reward_tap": 0.0,
+      "reward_oracle": 0.0,
+      "reward_spread": 0.0,
+      "tap_obs_source": "disabled"
+    },
+    {
+      "episode": 7,
+      "seed": 7,
+      "policy_step": 12,
+      "env_steps": 96,
+      "n_contacts": 0,
+      "rewards_k": [
+        0.0
+      ],
+      "tap_scores": [
+        0.0
+      ],
+      "tap_pick": 0,
+      "reward_notap": 0.0,
+      "reward_tap": 0.0,
+      "reward_oracle": 0.0,
+      "reward_spread": 0.0,
+      "tap_obs_source": "disabled"
+    },
+    {
+      "episode": 7,
+      "seed": 7,
+      "policy_step": 17,
+      "env_steps": 136,
+      "n_contacts": 0,
+      "rewards_k": [
+        0.0
+      ],
+      "tap_scores": [
+        0.0
+      ],
+      "tap_pick": 0,
+      "reward_notap": 0.0,
+      "reward_tap": 0.0,
+      "reward_oracle": 0.0,
+      "reward_spread": 0.0,
+      "tap_obs_source": "disabled"
+    },
+    {
+      "episode": 7,
+      "seed": 7,
+      "policy_step": 22,
+      "env_steps": 176,
+      "n_contacts": 0,
+      "rewards_k": [
+        0.0
+      ],
+      "tap_scores": [
+        0.0
+      ],
+      "tap_pick": 0,
+      "reward_notap": 0.0,
+      "reward_tap": 0.0,
+      "reward_oracle": 0.0,
+      "reward_spread": 0.0,
+      "tap_obs_source": "disabled"
+    },
+    {
+      "episode": 8,
+      "seed": 8,
+      "policy_step": 2,
+      "env_steps": 16,
+      "n_contacts": 0,
+      "rewards_k": [
+        0.3802439679224821
+      ],
+      "tap_scores": [
+        0.0
+      ],
+      "tap_pick": 0,
+      "reward_notap": 0.3802439679224821,
+      "reward_tap": 0.3802439679224821,
+      "reward_oracle": 0.3802439679224821,
+      "reward_spread": 0.0,
+      "tap_obs_source": "disabled"
+    },
+    {
+      "episode": 8,
+      "seed": 8,
+      "policy_step": 7,
+      "env_steps": 56,
+      "n_contacts": 0,
+      "rewards_k": [
+        0.03945806734372919
+      ],
+      "tap_scores": [
+        0.0
+      ],
+      "tap_pick": 0,
+      "reward_notap": 0.03945806734372919,
+      "reward_tap": 0.03945806734372919,
+      "reward_oracle": 0.03945806734372919,
+      "reward_spread": 0.0,
+      "tap_obs_source": "disabled"
+    },
+    {
+      "episode": 8,
+      "seed": 8,
+      "policy_step": 12,
+      "env_steps": 96,
+      "n_contacts": 10,
+      "rewards_k": [
+        0.40188519731550826
+      ],
+      "tap_scores": [
+        0.0
+      ],
+      "tap_pick": 0,
+      "reward_notap": 0.40188519731550826,
+      "reward_tap": 0.40188519731550826,
+      "reward_oracle": 0.40188519731550826,
+      "reward_spread": 0.0,
+      "tap_obs_source": "disabled"
+    },
+    {
+      "episode": 8,
+      "seed": 8,
+      "policy_step": 17,
+      "env_steps": 136,
+      "n_contacts": 13,
+      "rewards_k": [
+        0.24810586977371665
+      ],
+      "tap_scores": [
+        0.0
+      ],
+      "tap_pick": 0,
+      "reward_notap": 0.24810586977371665,
+      "reward_tap": 0.24810586977371665,
+      "reward_oracle": 0.24810586977371665,
+      "reward_spread": 0.0,
+      "tap_obs_source": "disabled"
+    },
+    {
+      "episode": 8,
+      "seed": 8,
+      "policy_step": 22,
+      "env_steps": 176,
+      "n_contacts": 0,
+      "rewards_k": [
+        0.38340579854210355
+      ],
+      "tap_scores": [
+        0.0
+      ],
+      "tap_pick": 0,
+      "reward_notap": 0.38340579854210355,
+      "reward_tap": 0.38340579854210355,
+      "reward_oracle": 0.38340579854210355,
+      "reward_spread": 0.0,
+      "tap_obs_source": "disabled"
+    },
+    {
+      "episode": 9,
+      "seed": 9,
+      "policy_step": 2,
+      "env_steps": 16,
+      "n_contacts": 0,
+      "rewards_k": [
+        0.0
+      ],
+      "tap_scores": [
+        0.0
+      ],
+      "tap_pick": 0,
+      "reward_notap": 0.0,
+      "reward_tap": 0.0,
+      "reward_oracle": 0.0,
+      "reward_spread": 0.0,
+      "tap_obs_source": "disabled"
+    },
+    {
+      "episode": 9,
+      "seed": 9,
+      "policy_step": 7,
+      "env_steps": 56,
+      "n_contacts": 10,
+      "rewards_k": [
+        0.35483439743770345
+      ],
+      "tap_scores": [
+        0.0
+      ],
+      "tap_pick": 0,
+      "reward_notap": 0.35483439743770345,
+      "reward_tap": 0.35483439743770345,
+      "reward_oracle": 0.35483439743770345,
+      "reward_spread": 0.0,
+      "tap_obs_source": "disabled"
+    },
+    {
+      "episode": 9,
+      "seed": 9,
+      "policy_step": 12,
+      "env_steps": 96,
+      "n_contacts": 0,
+      "rewards_k": [
+        1.0
+      ],
+      "tap_scores": [
+        0.0
+      ],
+      "tap_pick": 0,
+      "reward_notap": 1.0,
+      "reward_tap": 1.0,
+      "reward_oracle": 1.0,
+      "reward_spread": 0.0,
+      "tap_obs_source": "disabled"
+    },
+    {
+      "episode": 10,
+      "seed": 10,
+      "policy_step": 2,
+      "env_steps": 16,
+      "n_contacts": 0,
+      "rewards_k": [
+        0.16863764918567498
+      ],
+      "tap_scores": [
+        0.0
+      ],
+      "tap_pick": 0,
+      "reward_notap": 0.16863764918567498,
+      "reward_tap": 0.16863764918567498,
+      "reward_oracle": 0.16863764918567498,
+      "reward_spread": 0.0,
+      "tap_obs_source": "disabled"
+    },
+    {
+      "episode": 10,
+      "seed": 10,
+      "policy_step": 7,
+      "env_steps": 56,
+      "n_contacts": 10,
+      "rewards_k": [
+        0.40141007308057547
+      ],
+      "tap_scores": [
+        0.0
+      ],
+      "tap_pick": 0,
+      "reward_notap": 0.40141007308057547,
+      "reward_tap": 0.40141007308057547,
+      "reward_oracle": 0.40141007308057547,
+      "reward_spread": 0.0,
+      "tap_obs_source": "disabled"
+    },
+    {
+      "episode": 10,
+      "seed": 10,
+      "policy_step": 12,
+      "env_steps": 96,
+      "n_contacts": 10,
+      "rewards_k": [
+        0.37571321412842534
+      ],
+      "tap_scores": [
+        0.0
+      ],
+      "tap_pick": 0,
+      "reward_notap": 0.37571321412842534,
+      "reward_tap": 0.37571321412842534,
+      "reward_oracle": 0.37571321412842534,
+      "reward_spread": 0.0,
+      "tap_obs_source": "disabled"
+    },
+    {
+      "episode": 10,
+      "seed": 10,
+      "policy_step": 17,
+      "env_steps": 136,
+      "n_contacts": 1,
+      "rewards_k": [
+        0.5811229077148014
+      ],
+      "tap_scores": [
+        0.0
+      ],
+      "tap_pick": 0,
+      "reward_notap": 0.5811229077148014,
+      "reward_tap": 0.5811229077148014,
+      "reward_oracle": 0.5811229077148014,
+      "reward_spread": 0.0,
+      "tap_obs_source": "disabled"
+    },
+    {
+      "episode": 10,
+      "seed": 10,
+      "policy_step": 22,
+      "env_steps": 176,
+      "n_contacts": 9,
+      "rewards_k": [
+        0.9418620952953717
+      ],
+      "tap_scores": [
+        0.0
+      ],
+      "tap_pick": 0,
+      "reward_notap": 0.9418620952953717,
+      "reward_tap": 0.9418620952953717,
+      "reward_oracle": 0.9418620952953717,
+      "reward_spread": 0.0,
+      "tap_obs_source": "disabled"
+    },
+    {
+      "episode": 11,
+      "seed": 11,
+      "policy_step": 2,
+      "env_steps": 16,
+      "n_contacts": 0,
+      "rewards_k": [
+        0.0024447866748263736
+      ],
+      "tap_scores": [
+        0.0
+      ],
+      "tap_pick": 0,
+      "reward_notap": 0.0024447866748263736,
+      "reward_tap": 0.0024447866748263736,
+      "reward_oracle": 0.0024447866748263736,
+      "reward_spread": 0.0,
+      "tap_obs_source": "disabled"
+    },
+    {
+      "episode": 11,
+      "seed": 11,
+      "policy_step": 7,
+      "env_steps": 56,
+      "n_contacts": 9,
+      "rewards_k": [
+        0.6373213000064336
+      ],
+      "tap_scores": [
+        0.0
+      ],
+      "tap_pick": 0,
+      "reward_notap": 0.6373213000064336,
+      "reward_tap": 0.6373213000064336,
+      "reward_oracle": 0.6373213000064336,
+      "reward_spread": 0.0,
+      "tap_obs_source": "disabled"
+    },
+    {
+      "episode": 11,
+      "seed": 11,
+      "policy_step": 12,
+      "env_steps": 96,
+      "n_contacts": 0,
+      "rewards_k": [
+        0.7305683662781467
+      ],
+      "tap_scores": [
+        0.0
+      ],
+      "tap_pick": 0,
+      "reward_notap": 0.7305683662781467,
+      "reward_tap": 0.7305683662781467,
+      "reward_oracle": 0.7305683662781467,
+      "reward_spread": 0.0,
+      "tap_obs_source": "disabled"
+    },
+    {
+      "episode": 11,
+      "seed": 11,
+      "policy_step": 17,
+      "env_steps": 136,
+      "n_contacts": 0,
+      "rewards_k": [
+        0.7908484857123618
+      ],
+      "tap_scores": [
+        0.0
+      ],
+      "tap_pick": 0,
+      "reward_notap": 0.7908484857123618,
+      "reward_tap": 0.7908484857123618,
+      "reward_oracle": 0.7908484857123618,
+      "reward_spread": 0.0,
+      "tap_obs_source": "disabled"
+    },
+    {
+      "episode": 11,
+      "seed": 11,
+      "policy_step": 22,
+      "env_steps": 176,
+      "n_contacts": 10,
+      "rewards_k": [
+        0.9875991679838999
+      ],
+      "tap_scores": [
+        0.0
+      ],
+      "tap_pick": 0,
+      "reward_notap": 0.9875991679838999,
+      "reward_tap": 0.9875991679838999,
+      "reward_oracle": 0.9875991679838999,
+      "reward_spread": 0.0,
+      "tap_obs_source": "disabled"
+    },
+    {
+      "episode": 12,
+      "seed": 12,
+      "policy_step": 2,
+      "env_steps": 16,
+      "n_contacts": 9,
+      "rewards_k": [
+        0.0
+      ],
+      "tap_scores": [
+        0.0
+      ],
+      "tap_pick": 0,
+      "reward_notap": 0.0,
+      "reward_tap": 0.0,
+      "reward_oracle": 0.0,
+      "reward_spread": 0.0,
+      "tap_obs_source": "disabled"
+    },
+    {
+      "episode": 12,
+      "seed": 12,
+      "policy_step": 7,
+      "env_steps": 56,
+      "n_contacts": 19,
+      "rewards_k": [
+        0.533816336028354
+      ],
+      "tap_scores": [
+        0.0
+      ],
+      "tap_pick": 0,
+      "reward_notap": 0.533816336028354,
+      "reward_tap": 0.533816336028354,
+      "reward_oracle": 0.533816336028354,
+      "reward_spread": 0.0,
+      "tap_obs_source": "disabled"
+    },
+    {
+      "episode": 12,
+      "seed": 12,
+      "policy_step": 12,
+      "env_steps": 96,
+      "n_contacts": 10,
+      "rewards_k": [
+        0.8540575018535115
+      ],
+      "tap_scores": [
+        0.0
+      ],
+      "tap_pick": 0,
+      "reward_notap": 0.8540575018535115,
+      "reward_tap": 0.8540575018535115,
+      "reward_oracle": 0.8540575018535115,
+      "reward_spread": 0.0,
+      "tap_obs_source": "disabled"
+    },
+    {
+      "episode": 13,
+      "seed": 13,
+      "policy_step": 2,
+      "env_steps": 16,
+      "n_contacts": 11,
+      "rewards_k": [
+        0.0
+      ],
+      "tap_scores": [
+        0.0
+      ],
+      "tap_pick": 0,
+      "reward_notap": 0.0,
+      "reward_tap": 0.0,
+      "reward_oracle": 0.0,
+      "reward_spread": 0.0,
+      "tap_obs_source": "disabled"
+    },
+    {
+      "episode": 13,
+      "seed": 13,
+      "policy_step": 7,
+      "env_steps": 56,
+      "n_contacts": 10,
+      "rewards_k": [
+        0.0
+      ],
+      "tap_scores": [
+        0.0
+      ],
+      "tap_pick": 0,
+      "reward_notap": 0.0,
+      "reward_tap": 0.0,
+      "reward_oracle": 0.0,
+      "reward_spread": 0.0,
+      "tap_obs_source": "disabled"
+    },
+    {
+      "episode": 13,
+      "seed": 13,
+      "policy_step": 12,
+      "env_steps": 96,
+      "n_contacts": 0,
+      "rewards_k": [
+        0.0
+      ],
+      "tap_scores": [
+        0.0
+      ],
+      "tap_pick": 0,
+      "reward_notap": 0.0,
+      "reward_tap": 0.0,
+      "reward_oracle": 0.0,
+      "reward_spread": 0.0,
+      "tap_obs_source": "disabled"
+    },
+    {
+      "episode": 13,
+      "seed": 13,
+      "policy_step": 17,
+      "env_steps": 136,
+      "n_contacts": 23,
+      "rewards_k": [
+        0.0
+      ],
+      "tap_scores": [
+        0.0
+      ],
+      "tap_pick": 0,
+      "reward_notap": 0.0,
+      "reward_tap": 0.0,
+      "reward_oracle": 0.0,
+      "reward_spread": 0.0,
+      "tap_obs_source": "disabled"
+    },
+    {
+      "episode": 13,
+      "seed": 13,
+      "policy_step": 22,
+      "env_steps": 176,
+      "n_contacts": 20,
+      "rewards_k": [
+        0.0
+      ],
+      "tap_scores": [
+        0.0
+      ],
+      "tap_pick": 0,
+      "reward_notap": 0.0,
+      "reward_tap": 0.0,
+      "reward_oracle": 0.0,
+      "reward_spread": 0.0,
+      "tap_obs_source": "disabled"
+    },
+    {
+      "episode": 14,
+      "seed": 14,
+      "policy_step": 2,
+      "env_steps": 16,
+      "n_contacts": 10,
+      "rewards_k": [
+        0.0
+      ],
+      "tap_scores": [
+        0.0
+      ],
+      "tap_pick": 0,
+      "reward_notap": 0.0,
+      "reward_tap": 0.0,
+      "reward_oracle": 0.0,
+      "reward_spread": 0.0,
+      "tap_obs_source": "disabled"
+    },
+    {
+      "episode": 14,
+      "seed": 14,
+      "policy_step": 7,
+      "env_steps": 56,
+      "n_contacts": 0,
+      "rewards_k": [
+        0.0
+      ],
+      "tap_scores": [
+        0.0
+      ],
+      "tap_pick": 0,
+      "reward_notap": 0.0,
+      "reward_tap": 0.0,
+      "reward_oracle": 0.0,
+      "reward_spread": 0.0,
+      "tap_obs_source": "disabled"
+    },
+    {
+      "episode": 14,
+      "seed": 14,
+      "policy_step": 12,
+      "env_steps": 96,
+      "n_contacts": 0,
+      "rewards_k": [
+        0.0
+      ],
+      "tap_scores": [
+        0.0
+      ],
+      "tap_pick": 0,
+      "reward_notap": 0.0,
+      "reward_tap": 0.0,
+      "reward_oracle": 0.0,
+      "reward_spread": 0.0,
+      "tap_obs_source": "disabled"
+    },
+    {
+      "episode": 14,
+      "seed": 14,
+      "policy_step": 17,
+      "env_steps": 136,
+      "n_contacts": 0,
+      "rewards_k": [
+        0.0
+      ],
+      "tap_scores": [
+        0.0
+      ],
+      "tap_pick": 0,
+      "reward_notap": 0.0,
+      "reward_tap": 0.0,
+      "reward_oracle": 0.0,
+      "reward_spread": 0.0,
+      "tap_obs_source": "disabled"
+    },
+    {
+      "episode": 14,
+      "seed": 14,
+      "policy_step": 22,
+      "env_steps": 176,
+      "n_contacts": 0,
+      "rewards_k": [
+        0.0
+      ],
+      "tap_scores": [
+        0.0
+      ],
+      "tap_pick": 0,
+      "reward_notap": 0.0,
+      "reward_tap": 0.0,
+      "reward_oracle": 0.0,
+      "reward_spread": 0.0,
+      "tap_obs_source": "disabled"
+    },
+    {
+      "episode": 15,
+      "seed": 15,
+      "policy_step": 2,
+      "env_steps": 16,
+      "n_contacts": 1,
+      "rewards_k": [
+        0.28930010022426195
+      ],
+      "tap_scores": [
+        0.0
+      ],
+      "tap_pick": 0,
+      "reward_notap": 0.28930010022426195,
+      "reward_tap": 0.28930010022426195,
+      "reward_oracle": 0.28930010022426195,
+      "reward_spread": 0.0,
+      "tap_obs_source": "disabled"
+    },
+    {
+      "episode": 15,
+      "seed": 15,
+      "policy_step": 7,
+      "env_steps": 56,
+      "n_contacts": 0,
+      "rewards_k": [
+        0.28670663990918466
+      ],
+      "tap_scores": [
+        0.0
+      ],
+      "tap_pick": 0,
+      "reward_notap": 0.28670663990918466,
+      "reward_tap": 0.28670663990918466,
+      "reward_oracle": 0.28670663990918466,
+      "reward_spread": 0.0,
+      "tap_obs_source": "disabled"
+    },
+    {
+      "episode": 15,
+      "seed": 15,
+      "policy_step": 12,
+      "env_steps": 96,
+      "n_contacts": 0,
+      "rewards_k": [
+        0.33683802782299443
+      ],
+      "tap_scores": [
+        0.0
+      ],
+      "tap_pick": 0,
+      "reward_notap": 0.33683802782299443,
+      "reward_tap": 0.33683802782299443,
+      "reward_oracle": 0.33683802782299443,
+      "reward_spread": 0.0,
+      "tap_obs_source": "disabled"
+    },
+    {
+      "episode": 15,
+      "seed": 15,
+      "policy_step": 17,
+      "env_steps": 136,
+      "n_contacts": 12,
+      "rewards_k": [
+        0.18211771509006378
+      ],
+      "tap_scores": [
+        0.0
+      ],
+      "tap_pick": 0,
+      "reward_notap": 0.18211771509006378,
+      "reward_tap": 0.18211771509006378,
+      "reward_oracle": 0.18211771509006378,
+      "reward_spread": 0.0,
+      "tap_obs_source": "disabled"
+    },
+    {
+      "episode": 15,
+      "seed": 15,
+      "policy_step": 22,
+      "env_steps": 176,
+      "n_contacts": 10,
+      "rewards_k": [
+        0.1423370343518857
+      ],
+      "tap_scores": [
+        0.0
+      ],
+      "tap_pick": 0,
+      "reward_notap": 0.1423370343518857,
+      "reward_tap": 0.1423370343518857,
+      "reward_oracle": 0.1423370343518857,
+      "reward_spread": 0.0,
+      "tap_obs_source": "disabled"
+    },
+    {
+      "episode": 16,
+      "seed": 16,
+      "policy_step": 2,
+      "env_steps": 16,
+      "n_contacts": 10,
+      "rewards_k": [
+        0.0
+      ],
+      "tap_scores": [
+        0.0
+      ],
+      "tap_pick": 0,
+      "reward_notap": 0.0,
+      "reward_tap": 0.0,
+      "reward_oracle": 0.0,
+      "reward_spread": 0.0,
+      "tap_obs_source": "disabled"
+    },
+    {
+      "episode": 16,
+      "seed": 16,
+      "policy_step": 7,
+      "env_steps": 56,
+      "n_contacts": 0,
+      "rewards_k": [
+        1.5975204562989014e-05
+      ],
+      "tap_scores": [
+        0.0
+      ],
+      "tap_pick": 0,
+      "reward_notap": 1.5975204562989014e-05,
+      "reward_tap": 1.5975204562989014e-05,
+      "reward_oracle": 1.5975204562989014e-05,
+      "reward_spread": 0.0,
+      "tap_obs_source": "disabled"
+    },
+    {
+      "episode": 16,
+      "seed": 16,
+      "policy_step": 12,
+      "env_steps": 96,
+      "n_contacts": 9,
+      "rewards_k": [
+        0.17321295669147013
+      ],
+      "tap_scores": [
+        0.0
+      ],
+      "tap_pick": 0,
+      "reward_notap": 0.17321295669147013,
+      "reward_tap": 0.17321295669147013,
+      "reward_oracle": 0.17321295669147013,
+      "reward_spread": 0.0,
+      "tap_obs_source": "disabled"
+    },
+    {
+      "episode": 16,
+      "seed": 16,
+      "policy_step": 17,
+      "env_steps": 136,
+      "n_contacts": 0,
+      "rewards_k": [
+        0.9670846361594732
+      ],
+      "tap_scores": [
+        0.0
+      ],
+      "tap_pick": 0,
+      "reward_notap": 0.9670846361594732,
+      "reward_tap": 0.9670846361594732,
+      "reward_oracle": 0.9670846361594732,
+      "reward_spread": 0.0,
+      "tap_obs_source": "disabled"
+    },
+    {
+      "episode": 16,
+      "seed": 16,
+      "policy_step": 22,
+      "env_steps": 176,
+      "n_contacts": 0,
+      "rewards_k": [
+        0.9874870618816582
+      ],
+      "tap_scores": [
+        0.0
+      ],
+      "tap_pick": 0,
+      "reward_notap": 0.9874870618816582,
+      "reward_tap": 0.9874870618816582,
+      "reward_oracle": 0.9874870618816582,
+      "reward_spread": 0.0,
+      "tap_obs_source": "disabled"
+    },
+    {
+      "episode": 17,
+      "seed": 17,
+      "policy_step": 2,
+      "env_steps": 16,
+      "n_contacts": 0,
+      "rewards_k": [
+        0.1398904649971497
+      ],
+      "tap_scores": [
+        0.0
+      ],
+      "tap_pick": 0,
+      "reward_notap": 0.1398904649971497,
+      "reward_tap": 0.1398904649971497,
+      "reward_oracle": 0.1398904649971497,
+      "reward_spread": 0.0,
+      "tap_obs_source": "disabled"
+    },
+    {
+      "episode": 17,
+      "seed": 17,
+      "policy_step": 7,
+      "env_steps": 56,
+      "n_contacts": 0,
+      "rewards_k": [
+        0.5031031841976397
+      ],
+      "tap_scores": [
+        0.0
+      ],
+      "tap_pick": 0,
+      "reward_notap": 0.5031031841976397,
+      "reward_tap": 0.5031031841976397,
+      "reward_oracle": 0.5031031841976397,
+      "reward_spread": 0.0,
+      "tap_obs_source": "disabled"
+    },
+    {
+      "episode": 18,
+      "seed": 18,
+      "policy_step": 2,
+      "env_steps": 16,
+      "n_contacts": 0,
+      "rewards_k": [
+        0.5243060952992826
+      ],
+      "tap_scores": [
+        0.0
+      ],
+      "tap_pick": 0,
+      "reward_notap": 0.5243060952992826,
+      "reward_tap": 0.5243060952992826,
+      "reward_oracle": 0.5243060952992826,
+      "reward_spread": 0.0,
+      "tap_obs_source": "disabled"
+    },
+    {
+      "episode": 18,
+      "seed": 18,
+      "policy_step": 7,
+      "env_steps": 56,
+      "n_contacts": 0,
+      "rewards_k": [
+        0.30175244134598833
+      ],
+      "tap_scores": [
+        0.0
+      ],
+      "tap_pick": 0,
+      "reward_notap": 0.30175244134598833,
+      "reward_tap": 0.30175244134598833,
+      "reward_oracle": 0.30175244134598833,
+      "reward_spread": 0.0,
+      "tap_obs_source": "disabled"
+    },
+    {
+      "episode": 18,
+      "seed": 18,
+      "policy_step": 12,
+      "env_steps": 96,
+      "n_contacts": 10,
+      "rewards_k": [
+        0.8609558269307236
+      ],
+      "tap_scores": [
+        0.0
+      ],
+      "tap_pick": 0,
+      "reward_notap": 0.8609558269307236,
+      "reward_tap": 0.8609558269307236,
+      "reward_oracle": 0.8609558269307236,
+      "reward_spread": 0.0,
+      "tap_obs_source": "disabled"
+    },
+    {
+      "episode": 18,
+      "seed": 18,
+      "policy_step": 17,
+      "env_steps": 136,
+      "n_contacts": 0,
+      "rewards_k": [
+        0.9917585559698994
+      ],
+      "tap_scores": [
+        0.0
+      ],
+      "tap_pick": 0,
+      "reward_notap": 0.9917585559698994,
+      "reward_tap": 0.9917585559698994,
+      "reward_oracle": 0.9917585559698994,
+      "reward_spread": 0.0,
+      "tap_obs_source": "disabled"
+    },
+    {
+      "episode": 18,
+      "seed": 18,
+      "policy_step": 22,
+      "env_steps": 176,
+      "n_contacts": 0,
+      "rewards_k": [
+        0.9587753318375123
+      ],
+      "tap_scores": [
+        0.0
+      ],
+      "tap_pick": 0,
+      "reward_notap": 0.9587753318375123,
+      "reward_tap": 0.9587753318375123,
+      "reward_oracle": 0.9587753318375123,
+      "reward_spread": 0.0,
+      "tap_obs_source": "disabled"
+    },
+    {
+      "episode": 19,
+      "seed": 19,
+      "policy_step": 2,
+      "env_steps": 16,
+      "n_contacts": 0,
+      "rewards_k": [
+        0.3817759953888277
+      ],
+      "tap_scores": [
+        0.0
+      ],
+      "tap_pick": 0,
+      "reward_notap": 0.3817759953888277,
+      "reward_tap": 0.3817759953888277,
+      "reward_oracle": 0.3817759953888277,
+      "reward_spread": 0.0,
+      "tap_obs_source": "disabled"
+    },
+    {
+      "episode": 19,
+      "seed": 19,
+      "policy_step": 7,
+      "env_steps": 56,
+      "n_contacts": 0,
+      "rewards_k": [
+        0.9042740983237202
+      ],
+      "tap_scores": [
+        0.0
+      ],
+      "tap_pick": 0,
+      "reward_notap": 0.9042740983237202,
+      "reward_tap": 0.9042740983237202,
+      "reward_oracle": 0.9042740983237202,
+      "reward_spread": 0.0,
+      "tap_obs_source": "disabled"
+    }
+  ]
+}
