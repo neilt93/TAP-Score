@@ -44,6 +44,32 @@ BENCHMARKS = {
         "download_url": "https://diffusion-policy.cs.columbia.edu/data/training/kitchen.zip",
         "description": "9-DoF kitchen manipulation task (state observations)",
     },
+    "robomimic_lift_lowdim": {
+        "name": "Lift (lowdim)",
+        "action_dim": 7,
+        "obs_type": "state",
+        "obs_dim": 19,  # Validated: object(10) + eef_pos(3) + eef_quat(4) + gripper_qpos(2)
+        "obs_window": 2,
+        "action_chunk": 10,  # Placeholder — derive from DP config (horizon) at runtime
+        "data_format": "hdf5",
+        "data_subdir": "robomimic/datasets/lift/ph",
+        "hdf5_file": "low_dim.hdf5",
+        "obs_keys": ["object", "robot0_eef_pos", "robot0_eef_quat", "robot0_gripper_qpos"],
+        "description": "7-DoF robotic lift task (state observations)",
+    },
+    "robomimic_can_lowdim": {
+        "name": "Can (lowdim)",
+        "action_dim": 7,
+        "obs_type": "state",
+        "obs_dim": 23,  # Validated: object(14) + eef_pos(3) + eef_quat(4) + gripper_qpos(2)
+        "obs_window": 2,
+        "action_chunk": 10,  # Placeholder — derive from DP config (horizon) at runtime
+        "data_format": "hdf5",
+        "data_subdir": "robomimic/datasets/can/ph",
+        "hdf5_file": "low_dim.hdf5",
+        "obs_keys": ["object", "robot0_eef_pos", "robot0_eef_quat", "robot0_gripper_qpos"],
+        "description": "7-DoF robotic can-picking task (state observations)",
+    },
 }
 
 
@@ -59,9 +85,11 @@ def get_data_path(benchmark: str, data_root: str = "data/processed") -> Path:
     config = get_benchmark_config(benchmark)
     base_path = Path(data_root) / config["data_subdir"]
 
-    # If zarr_file is specified, append it to the path
+    # If zarr_file or hdf5_file is specified, append it to the path
     if "zarr_file" in config:
         return base_path / config["zarr_file"]
+    if "hdf5_file" in config:
+        return base_path / config["hdf5_file"]
     return base_path
 
 
@@ -73,7 +101,7 @@ def list_benchmarks() -> list:
 def print_benchmark_info():
     """Print information about all benchmarks."""
     print("Available Benchmarks:")
-    print("-" * 70)
+    print("-" * 80)
     for key, cfg in BENCHMARKS.items():
-        print(f"  {key:12} | {cfg['name']:20} | action_dim={cfg['action_dim']} | {cfg['data_format']}")
-    print("-" * 70)
+        print(f"  {key:25} | {cfg['name']:20} | action_dim={cfg['action_dim']} | {cfg['data_format']}")
+    print("-" * 80)

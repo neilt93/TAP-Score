@@ -18,8 +18,7 @@ Usage:
 
     python scripts/reranking_experiment.py \
         --dp_checkpoint baselines/diffusion_policy/data/checkpoints/pusht_image_latest.ckpt \
-        --tap_checkpoint checkpoints_contrastive/pusht/contrastive_tap_best.pt \
-        --tap_config checkpoints_contrastive/pusht/config.json \
+        --tap_checkpoint checkpoints_contrastive/pusht/contrastive_tap_h8_best.pt \
         --n_episodes 20 --K 8 --L 5 --perturb occlusion --patch_size 24 --device cuda
 """
 from __future__ import annotations
@@ -390,7 +389,7 @@ def main():
     if use_tap:
         print("Loading TAP-Score model...")
         tap_model, tap_config = load_tap_model(args.tap_checkpoint, args.tap_config, device)
-        tap_action_chunk = tap_config["action_chunk"]  # 16
+        tap_action_chunk = tap_config["action_chunk"]
         print(f"  TAP action_chunk={tap_action_chunk}, hidden_dim={tap_config['hidden_dim']}")
         tap_obs_window = int(tap_config.get("obs_window", n_obs_steps))
         if tap_obs_window != n_obs_steps:

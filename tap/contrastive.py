@@ -669,41 +669,233 @@ class ContrastiveStateTAPDataset(Dataset):
         }
 
 
-def create_contrastive_dataloaders(data_path, batch_size=32, train_split=0.9, obs_type='image', **kwargs):
+class ContrastiveHDF5StateTAPDataset(Dataset):
+    """
+    Dataset for contrastive TAP training with HDF5 lowdim state observations (Robomimic).
+
+    Reads demos from HDF5, concatenates obs_keys into flat state vectors,
+    and reuses the same negative sampling logic as ContrastiveStateTAPDataset.
+    """
+
+    def __init__(
+        self,
+        data_path,
+        obs_keys,
+        obs_window=2,
+        action_chunk=10,
+        n_negatives=15,
+        hard_negative_ratio=0.5,
+        noise_std=0.1,
+        episode_filter=None,
+    ):
+        self.obs_window = obs_window
+        self.action_chunk = action_chunk
+        self.n_negatives = n_negatives
+        self.hard_negative_ratio = hard_negative_ratio
+        self.noise_std = noise_std
+        self.episode_filter = episode_filter
+        self.obs_keys = obs_keys
+
+        self.data_path = Path(data_path)
+        self._load_data()
+        self._create_index()
+
+    def _load_data(self):
+        import h5py
+
+        all_obs = []
+        all_actions = []
+        episode_ends = []
+
+        with h5py.File(str(self.data_path), 'r') as f:
+            demos = f['data']
+            demo_keys = sorted((k for k in demos.keys() if k.startswith('demo_')),
+                               key=lambda k: int(k.split('_')[1]))
+
+            # Validate obs keys on first demo
+            first_demo = demos[demo_keys[0]]
+            total_obs_dim = 0
+            for key in self.obs_keys:
+                if key not in first_demo['obs']:
+                    available = list(first_demo['obs'].keys())
+                    raise ValueError(f"obs key '{key}' not in HDF5. Available: {available}")
+                total_obs_dim += first_demo['obs'][key].shape[-1]
+
+            cumulative = 0
+            for demo_key in demo_keys:
+                demo = demos[demo_key]
+                obs_parts = [demo['obs'][k][:] for k in self.obs_keys]
+                obs = np.concatenate(obs_parts, axis=-1).astype(np.float32)
+                actions = demo['actions'][:].astype(np.float32)
+                all_obs.append(obs)
+                all_actions.append(actions)
+                cumulative += len(actions)
+                episode_ends.append(cumulative)
+
+        self.obs = np.concatenate(all_obs, axis=0)
+        self.actions = np.concatenate(all_actions, axis=0)
+        self.episode_ends = np.array(episode_ends)
+        self.obs_dim = self.obs.shape[-1]
+        self.action_dim = self.actions.shape[-1]
+        self.episode_starts = np.concatenate([[0], self.episode_ends[:-1]])
+        self.num_episodes = len(self.episode_ends)
+
+        print(f"Loaded {self.num_episodes} demos from HDF5, {len(self.obs)} frames")
+        print(f"  obs_dim={self.obs_dim}, action_dim={self.action_dim}")
+        assert self.obs_dim == total_obs_dim, (
+            f"obs_dim mismatch: got {self.obs_dim}, expected {total_obs_dim}"
+        )
+
+    def _create_index(self):
+        self.valid_indices = []
+        min_len = self.obs_window + self.action_chunk
+
+        for ep_idx in range(self.num_episodes):
+            if self.episode_filter is not None and ep_idx not in self.episode_filter:
+                continue
+
+            start = self.episode_starts[ep_idx]
+            end = self.episode_ends[ep_idx]
+            ep_len = end - start
+
+            if ep_len < min_len:
+                continue
+
+            for t in range(self.obs_window - 1, ep_len - self.action_chunk):
+                global_t = start + t
+                self.valid_indices.append((ep_idx, global_t))
+
+        print(f"Created {len(self.valid_indices)} valid samples")
+
+    def __len__(self):
+        return len(self.valid_indices)
+
+    def _get_obs_window(self, global_t):
+        start_t = global_t - self.obs_window + 1
+        return self.obs[start_t:global_t + 1].copy()
+
+    def _get_action_chunk(self, global_t):
+        return self.actions[global_t:global_t + self.action_chunk].copy()
+
+    def _get_random_action_chunk(self, exclude_ep_idx, exclude_t):
+        while True:
+            idx = np.random.randint(len(self.valid_indices))
+            ep_idx, global_t = self.valid_indices[idx]
+            if ep_idx != exclude_ep_idx or abs(global_t - exclude_t) > self.action_chunk * 2:
+                return self._get_action_chunk(global_t)
+
+    def _get_hard_negative(self, positive_action, neg_type):
+        if neg_type == 0:
+            return positive_action + np.random.randn(*positive_action.shape).astype(np.float32) * self.noise_std
+        elif neg_type == 1:
+            perm = np.random.permutation(self.action_chunk)
+            return positive_action[perm]
+        elif neg_type == 2:
+            mirrored = positive_action.copy()
+            dim_to_negate = np.random.randint(positive_action.shape[1])
+            mirrored[:, dim_to_negate] = -mirrored[:, dim_to_negate]
+            return mirrored
+        elif neg_type == 3:
+            d = positive_action.shape[1]
+            q, _ = np.linalg.qr(np.random.randn(d, d).astype(np.float32))
+            return (positive_action @ q.T).astype(np.float32)
+        else:
+            swapped = positive_action.copy()
+            d = positive_action.shape[1]
+            perm = np.random.permutation(d)
+            return swapped[:, perm].astype(np.float32)
+
+    def __getitem__(self, idx):
+        ep_idx, global_t = self.valid_indices[idx]
+
+        obs = self._get_obs_window(global_t)
+        positive_action = self._get_action_chunk(global_t)
+
+        n_hard = int(self.n_negatives * self.hard_negative_ratio)
+        n_random = self.n_negatives - n_hard
+
+        negatives = []
+
+        for i in range(n_hard):
+            neg_type = i % 5
+            negatives.append(self._get_hard_negative(positive_action, neg_type))
+
+        for _ in range(n_random):
+            negatives.append(self._get_random_action_chunk(ep_idx, global_t))
+
+        all_actions = np.stack([positive_action] + negatives, axis=0)
+
+        return {
+            'obs': torch.from_numpy(obs),
+            'actions': torch.from_numpy(all_actions),
+        }
+
+
+def create_contrastive_dataloaders(data_path, batch_size=32, train_split=0.9, obs_type='image',
+                                   data_format='zarr', **kwargs):
     """Create train and validation dataloaders for contrastive TAP.
 
     Args:
-        data_path: Path to zarr dataset
+        data_path: Path to dataset (zarr directory or HDF5 file)
         batch_size: Batch size
         train_split: Fraction of episodes for training
         obs_type: 'image' for image observations, 'state' for state vectors
-        **kwargs: Additional arguments for dataset
+        data_format: 'zarr' or 'hdf5'
+        **kwargs: Additional arguments for dataset (obs_keys required for hdf5+state)
     """
     from torch.utils.data import DataLoader
 
-    root = zarr.open_group(str(data_path), mode='r')
-    episode_ends = root['meta']['episode_ends'][:]
-    num_episodes = len(episode_ends)
+    if data_format == 'hdf5' and obs_type == 'state':
+        # HDF5 lowdim path — count demos from HDF5 structure
+        import h5py
+        with h5py.File(str(data_path), 'r') as f:
+            demo_keys = sorted((k for k in f['data'].keys() if k.startswith('demo_')),
+                               key=lambda k: int(k.split('_')[1]))
+            num_episodes = len(demo_keys)
 
-    episode_indices = np.arange(num_episodes)
-    np.random.shuffle(episode_indices)
+        episode_indices = np.arange(num_episodes)
+        np.random.shuffle(episode_indices)
 
-    train_ep_count = int(num_episodes * train_split)
-    train_episodes = set(episode_indices[:train_ep_count].tolist())
-    val_episodes = set(episode_indices[train_ep_count:].tolist())
+        train_ep_count = int(num_episodes * train_split)
+        train_episodes = set(episode_indices[:train_ep_count].tolist())
+        val_episodes = set(episode_indices[train_ep_count:].tolist())
 
-    print(f"Episode split: {len(train_episodes)} train, {len(val_episodes)} val")
-    print(f"Observation type: {obs_type}")
+        print(f"Episode split: {len(train_episodes)} train, {len(val_episodes)} val")
+        print(f"Observation type: {obs_type}, format: hdf5")
 
-    # Choose dataset class based on observation type
-    if obs_type == 'image':
-        DatasetClass = ContrastiveTAPDataset
-        train_dataset = DatasetClass(data_path, episode_filter=train_episodes, augment=True, **kwargs)
-        val_dataset = DatasetClass(data_path, episode_filter=val_episodes, augment=False, **kwargs)
+        # Extract obs_keys from kwargs (required for HDF5 lowdim)
+        obs_keys = kwargs.pop('obs_keys', None)
+        if obs_keys is None:
+            raise ValueError("obs_keys is required for HDF5 lowdim datasets")
+
+        train_dataset = ContrastiveHDF5StateTAPDataset(
+            data_path, obs_keys=obs_keys, episode_filter=train_episodes, **kwargs)
+        val_dataset = ContrastiveHDF5StateTAPDataset(
+            data_path, obs_keys=obs_keys, episode_filter=val_episodes, **kwargs)
     else:
-        DatasetClass = ContrastiveStateTAPDataset
-        train_dataset = DatasetClass(data_path, episode_filter=train_episodes, **kwargs)
-        val_dataset = DatasetClass(data_path, episode_filter=val_episodes, **kwargs)
+        # Original zarr path
+        root = zarr.open_group(str(data_path), mode='r')
+        episode_ends = root['meta']['episode_ends'][:]
+        num_episodes = len(episode_ends)
+
+        episode_indices = np.arange(num_episodes)
+        np.random.shuffle(episode_indices)
+
+        train_ep_count = int(num_episodes * train_split)
+        train_episodes = set(episode_indices[:train_ep_count].tolist())
+        val_episodes = set(episode_indices[train_ep_count:].tolist())
+
+        print(f"Episode split: {len(train_episodes)} train, {len(val_episodes)} val")
+        print(f"Observation type: {obs_type}")
+
+        if obs_type == 'image':
+            DatasetClass = ContrastiveTAPDataset
+            train_dataset = DatasetClass(data_path, episode_filter=train_episodes, augment=True, **kwargs)
+            val_dataset = DatasetClass(data_path, episode_filter=val_episodes, augment=False, **kwargs)
+        else:
+            DatasetClass = ContrastiveStateTAPDataset
+            train_dataset = DatasetClass(data_path, episode_filter=train_episodes, **kwargs)
+            val_dataset = DatasetClass(data_path, episode_filter=val_episodes, **kwargs)
 
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=0)
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=0)

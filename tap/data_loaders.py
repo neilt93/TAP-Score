@@ -64,13 +64,14 @@ def load_zarr_episodes(data_path: str, obs_type: str = 'image') -> List[Dict[str
 
 
 def load_hdf5_episodes(data_path: str) -> List[Dict[str, np.ndarray]]:
-    """Load episodes from HDF5 format (Robomimic)."""
+    """Load episodes from HDF5 format (Robomimic) with image observations."""
     import h5py
 
     episodes = []
     with h5py.File(data_path, 'r') as f:
         demos = f['data']
-        demo_keys = sorted([k for k in demos.keys() if k.startswith('demo_')])
+        demo_keys = sorted([k for k in demos.keys() if k.startswith('demo_')],
+                           key=lambda k: int(k.split('_')[1]))
 
         for demo_key in demo_keys:
             demo = demos[demo_key]
@@ -100,6 +101,60 @@ def load_hdf5_episodes(data_path: str) -> List[Dict[str, np.ndarray]]:
     return episodes
 
 
+def load_hdf5_lowdim_episodes(data_path: str, obs_keys: List[str]) -> List[Dict[str, np.ndarray]]:
+    """Load episodes from HDF5 with lowdim state observations (Robomimic).
+
+    Concatenates the specified obs_keys into a flat state vector per timestep.
+    Validates shapes and prints summary statistics.
+
+    Args:
+        data_path: Path to HDF5 file
+        obs_keys: List of observation keys to concatenate (e.g. ['object', 'robot0_eef_pos', ...])
+
+    Returns:
+        List of episode dicts with 'obs' (T, obs_dim) and 'actions' (T, action_dim)
+    """
+    import h5py
+
+    episodes = []
+    with h5py.File(data_path, 'r') as f:
+        demos = f['data']
+        demo_keys = sorted((k for k in demos.keys() if k.startswith('demo_')),
+                           key=lambda k: int(k.split('_')[1]))
+
+        # Print obs key shapes from first demo for validation
+        first_demo = demos[demo_keys[0]]
+        print(f"  HDF5 obs keys in first demo:")
+        total_obs_dim = 0
+        for key in obs_keys:
+            if key not in first_demo['obs']:
+                available = list(first_demo['obs'].keys())
+                raise ValueError(f"obs key '{key}' not found in HDF5. Available: {available}")
+            shape = first_demo['obs'][key].shape
+            print(f"    {key}: {shape}")
+            total_obs_dim += shape[-1]
+        print(f"  Concatenated obs_dim: {total_obs_dim}")
+        print(f"  Action shape: {first_demo['actions'].shape}")
+        print(f"  Number of demos: {len(demo_keys)}")
+
+        for demo_key in demo_keys:
+            demo = demos[demo_key]
+            obs_parts = [demo['obs'][k][:] for k in obs_keys]
+            obs = np.concatenate(obs_parts, axis=-1)  # (T, obs_dim)
+            actions = demo['actions'][:]
+            episodes.append({
+                'obs': obs.astype(np.float32),
+                'actions': actions.astype(np.float32),
+                'obs_type': 'state',
+            })
+
+    # Print episode length stats
+    lengths = [len(ep['actions']) for ep in episodes]
+    print(f"  Episode lengths: min={min(lengths)}, max={max(lengths)}, mean={np.mean(lengths):.1f}")
+
+    return episodes
+
+
 def load_episodes(data_path: str, benchmark: str) -> List[Dict[str, np.ndarray]]:
     """
     Load episodes for a given benchmark using the appropriate format loader.
@@ -118,7 +173,10 @@ def load_episodes(data_path: str, benchmark: str) -> List[Dict[str, np.ndarray]]
     if data_format == "zarr":
         episodes = load_zarr_episodes(data_path, obs_type=obs_type)
     elif data_format == "hdf5":
-        episodes = load_hdf5_episodes(data_path)
+        if obs_type == "state" and "obs_keys" in config:
+            episodes = load_hdf5_lowdim_episodes(data_path, config["obs_keys"])
+        else:
+            episodes = load_hdf5_episodes(data_path)
     else:
         raise ValueError(f"Unknown data format: {data_format}")
 
