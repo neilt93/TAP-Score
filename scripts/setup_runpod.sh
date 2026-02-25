@@ -6,12 +6,12 @@ set -euo pipefail
 echo "=== TAP-Score RunPod Setup ==="
 
 # System dependencies (cmake needed by robomimic's egl_probe)
-echo "[1/6] Installing system dependencies..."
+echo "[1/7] Installing system dependencies..."
 apt-get update -qq && apt-get install -y -qq cmake > /dev/null 2>&1
 echo "  Done."
 
 # Python dependencies
-echo "[2/6] Installing Python dependencies..."
+echo "[2/7] Installing Python dependencies..."
 pip install -q \
   torch torchvision numpy \
   zarr h5py \
@@ -26,7 +26,7 @@ pip install -q \
 echo "  Done."
 
 # Clone and install Diffusion Policy
-echo "[3/6] Setting up Diffusion Policy..."
+echo "[3/7] Setting up Diffusion Policy..."
 if [ ! -d "baselines/diffusion_policy" ]; then
   mkdir -p baselines
   git clone https://github.com/real-stanford/diffusion_policy.git baselines/diffusion_policy
@@ -35,7 +35,7 @@ cd baselines/diffusion_policy && pip install -q -e . && cd ../..
 echo "  Done."
 
 # Download Push-T data
-echo "[4/6] Downloading Push-T dataset..."
+echo "[4/7] Downloading Push-T dataset..."
 if [ ! -d "data/raw/pusht/pusht_cchi_v7_replay.zarr" ]; then
   mkdir -p data/raw
   wget -q -O data/raw/pusht.zip "https://diffusion-policy.cs.columbia.edu/data/training/pusht.zip"
@@ -48,7 +48,7 @@ mkdir -p baselines/diffusion_policy/data
 ln -sfn "$(pwd)/data/raw/pusht" baselines/diffusion_policy/data/pusht
 
 # Download DP checkpoint
-echo "[5/6] Downloading robomimic lowdim datasets (lift, can)..."
+echo "[5/7] Downloading robomimic lowdim datasets (lift, can)..."
 if [ ! -f "data/robomimic/datasets/lift/ph/low_dim.hdf5" ] || \
    [ ! -f "data/robomimic/datasets/can/ph/low_dim.hdf5" ]; then
   mkdir -p data/robomimic/datasets
@@ -64,13 +64,33 @@ fi
 mkdir -p baselines/diffusion_policy/data/robomimic
 ln -sfn "$(pwd)/data/robomimic/datasets" baselines/diffusion_policy/data/robomimic/datasets
 
-echo "[6/6] Downloading Diffusion Policy checkpoint (~4GB)..."
+echo "[6/7] Downloading Push-T Diffusion Policy checkpoint..."
 CKPT=baselines/diffusion_policy/data/checkpoints/pusht_image_latest.ckpt
 if [ ! -f "$CKPT" ]; then
   mkdir -p baselines/diffusion_policy/data/checkpoints
   wget -O "$CKPT" "https://diffusion-policy.cs.columbia.edu/data/experiments/image/pusht/diffusion_policy_cnn/train_0/checkpoints/latest.ckpt"
 else
   echo "  Already exists."
+fi
+
+# Download pretrained robomimic lowdim DP checkpoints (Diffusion Policy CNN, not BC-RNN)
+echo "[7/7] Downloading robomimic lowdim DP checkpoints..."
+CKPT_BASE="https://diffusion-policy.cs.columbia.edu/data/experiments/low_dim"
+CKPT_DIR="data/robomimic/checkpoints"
+mkdir -p "$CKPT_DIR"
+
+LIFT_CKPT="$CKPT_DIR/lift_ph_diffusion_policy_cnn.ckpt"
+if [ ! -f "$LIFT_CKPT" ]; then
+  wget -O "$LIFT_CKPT" "$CKPT_BASE/lift_ph/diffusion_policy_cnn/train_0/checkpoints/latest.ckpt"
+else
+  echo "  Lift checkpoint already exists."
+fi
+
+CAN_CKPT="$CKPT_DIR/can_ph_diffusion_policy_cnn.ckpt"
+if [ ! -f "$CAN_CKPT" ]; then
+  wget -O "$CAN_CKPT" "$CKPT_BASE/can_ph/diffusion_policy_cnn/train_0/checkpoints/latest.ckpt"
+else
+  echo "  Can checkpoint already exists."
 fi
 
 # Verify
@@ -89,6 +109,13 @@ for task in ['lift', 'can']:
             print(f'  Robomimic {task}: {n} demos')
     else:
         print(f'  Robomimic {task}: NOT FOUND')
+import os
+for name, p in [('lift', '$LIFT_CKPT'), ('can', '$CAN_CKPT')]:
+    if os.path.exists(p):
+        s = os.path.getsize(p)
+        print(f'  Robomimic {name} DP ckpt: {s/1e6:.0f} MB')
+    else:
+        print(f'  Robomimic {name} DP ckpt: NOT FOUND')
 import torch; print(f'  CUDA: {torch.cuda.is_available()}, device: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else \"cpu\"}')
 print('  All good!')
 "

@@ -12,8 +12,12 @@ set -euo pipefail
 #   N_EPISODES (default 50), K (default 8), DEVICE (default cuda),
 #   DECISION_INTERVAL (default 5), SKIP_FIRST (default 2)
 
-: "${LIFT_CKPT:?Set LIFT_CKPT to lift checkpoint path}"
-: "${CAN_CKPT:?Set CAN_CKPT to can checkpoint path}"
+# Default to pretrained DP checkpoints from setup_runpod.sh
+LIFT_CKPT="${LIFT_CKPT:-data/robomimic/checkpoints/lift_ph_diffusion_policy_cnn.ckpt}"
+CAN_CKPT="${CAN_CKPT:-data/robomimic/checkpoints/can_ph_diffusion_policy_cnn.ckpt}"
+
+if [ ! -f "$LIFT_CKPT" ]; then echo "ERROR: Lift checkpoint not found: $LIFT_CKPT"; exit 1; fi
+if [ ! -f "$CAN_CKPT" ]; then echo "ERROR: Can checkpoint not found: $CAN_CKPT"; exit 1; fi
 
 N_EPISODES="${N_EPISODES:-50}"
 K="${K:-8}"
