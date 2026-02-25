@@ -35,14 +35,7 @@ DP_ROOT = REPO_ROOT / "baselines" / "diffusion_policy"
 if str(DP_ROOT) not in sys.path:
     sys.path.insert(0, str(DP_ROOT))
 
-try:
-    import robomimic.utils.env_utils as EnvUtils
-    import robomimic.utils.file_utils as FileUtils
-    import robomimic.utils.obs_utils as ObsUtils
-except ImportError as exc:
-    raise ImportError("robomimic is required. Install robomimic and its deps.") from exc
-
-from diffusion_policy.env.robomimic.robomimic_lowdim_wrapper import RobomimicLowdimWrapper
+import h5py
 
 
 def cfg_get(cfg_obj, key, default=None):
@@ -131,39 +124,39 @@ def main():
     print(f"Has sample(): {has_sample}")
     print("=" * 60)
 
-    # Create environment to get real observations
+    # Load observations from HDF5 dataset (avoids mujoco_py dependency)
     task_cfg = cfg.task
     dataset_path_cfg = str(cfg_get(task_cfg, "dataset_path"))
     dataset_path = resolve_existing_path(dataset_path_cfg)
-    env_meta = FileUtils.get_env_metadata_from_dataset(str(dataset_path))
-
     obs_keys = list(task_cfg.obs_keys)
-    ObsUtils.initialize_obs_modality_mapping_from_dict({"low_dim": obs_keys})
 
-    env = EnvUtils.create_env_from_metadata(
-        env_meta=env_meta, render=False, render_offscreen=False, use_image_obs=False,
-    )
-    wrapped = RobomimicLowdimWrapper(env=env, obs_keys=obs_keys)
+    print(f"Dataset: {dataset_path}")
+    print(f"Obs keys: {obs_keys}")
+
+    # Load a few observations from different demos
+    hdf5_obs_list = []
+    with h5py.File(str(dataset_path), "r") as f:
+        demo_keys = sorted([k for k in f["data"].keys() if k.startswith("demo_")])
+        rng = np.random.RandomState(42)
+        chosen = rng.choice(len(demo_keys), size=min(args.n_obs, len(demo_keys)), replace=False)
+        for idx in chosen:
+            dk = demo_keys[idx]
+            obs_dict = {}
+            for ok in obs_keys:
+                obs_dict[ok] = np.asarray(f["data"][dk]["obs"][ok][0], dtype=np.float32)
+            hdf5_obs_list.append(obs_dict)
+    print(f"Loaded {len(hdf5_obs_list)} observations from {len(demo_keys)} demos")
 
     all_spreads = []
     all_per_dim_stds = []
 
-    for obs_idx in range(args.n_obs):
-        # Get a fresh observation
-        wrapped.seed(obs_idx * 1000)
-        obs = wrapped.reset()
+    for obs_idx in range(len(hdf5_obs_list)):
+        obs_dict = hdf5_obs_list[obs_idx]
 
-        # Build obs tensor matching policy's expected format
-        if isinstance(obs, dict):
-            obs_dict = {k: np.asarray(v, dtype=np.float32) for k, v in obs.items()}
-        else:
-            obs_dict = {"obs": np.asarray(obs, dtype=np.float32)}
-
-        obs_tensor = {}
-        for key, val in obs_dict.items():
-            # Stack n_obs_steps copies (pad with same obs for initial state)
-            stacked = np.stack([val] * n_obs_steps, axis=0)
-            obs_tensor[key] = torch.from_numpy(stacked[None]).to(device=device, dtype=torch.float32)
+        # Concatenate all obs keys into single vector (policy expects {'obs': ...})
+        obs_concat = np.concatenate([obs_dict[k] for k in obs_keys], axis=-1)
+        stacked = np.stack([obs_concat] * n_obs_steps, axis=0)  # (n_obs_steps, obs_dim)
+        obs_tensor = {"obs": torch.from_numpy(stacked[None]).to(device=device, dtype=torch.float32)}
 
         # Sample K actions from same observation
         # Method 1: Batch query (how the audit does it)
@@ -240,9 +233,6 @@ def main():
         print("  -> Consider: (a) use a diffusion-policy checkpoint instead of BC-RNN,")
         print("               (b) add action noise for diversity,")
         print("               (c) report this as a negative result.")
-
-    if hasattr(wrapped, "close"):
-        wrapped.close()
 
     print("=" * 60)
 
