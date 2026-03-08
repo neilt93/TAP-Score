@@ -42,6 +42,7 @@ TAP-Score (Temporal Action-Proposal Scoring) — Off-manifold action detection i
 ### Risk Model (Active Approach)
 
 - **Model:** `RiskTAPScore` in `tap/risk.py` — obs_encoder(MLP) + action_encoder(MLP) → concat → sigmoid
+- **Obs-only variant:** `RiskTAPScore(obs_only=True)` — uses only obs_encoder, no action input. Baseline to test whether actions carry signal beyond state.
 - **Output:** `P(fail_within_H | obs, action)`, H=64 env steps (8 action chunks)
 - **Score in eval CSV:** `1.0 - risk_prob` (higher = safer)
 - **Labeling modes:**
@@ -119,6 +120,47 @@ python train_contrastive_tap.py --benchmark pusht --epochs 30 --batch_size 64
 
 # Evaluate (AUROC, operating points, M ablation)
 python eval_tap_final.py --benchmark pusht --n_episodes 40 --magnitude_preserving
+```
+
+### Obs-Only Baseline
+
+```bash
+# Train obs-only baseline (same data, no action encoder)
+python train_risk_tap.py \
+  --rollout_dir data/risk_rollouts/can/ \
+  --task can --epochs 30 --obs_only
+
+# Evaluate obs-only baseline
+python scripts/eval_tap_detection.py \
+  --dp_checkpoint data/robomimic/checkpoints/can_ph_diffusion_policy_cnn.ckpt \
+  --risk_model --tap_checkpoint checkpoints_contrastive/robomimic_can_lowdim/risk_tap_obs_only_best.pt \
+  --n_episodes 100 --output eval_results/detection_can_obs_only_n100.csv
+```
+
+### Intervention Evaluation
+
+```bash
+# Resample: pick safest of K proposals when risk exceeds threshold
+python scripts/eval_intervention.py \
+  --dp_checkpoint data/robomimic/checkpoints/can_ph_diffusion_policy_cnn.ckpt \
+  --tap_checkpoint checkpoints_contrastive/robomimic_can_lowdim/risk_tap_best.pt \
+  --task can --mode resample --K 4 --n_episodes 50
+
+# Early-stop + restart: terminate and retry when risk stays high
+python scripts/eval_intervention.py \
+  --dp_checkpoint data/robomimic/checkpoints/can_ph_diffusion_policy_cnn.ckpt \
+  --tap_checkpoint checkpoints_contrastive/robomimic_can_lowdim/risk_tap_best.pt \
+  --task can --mode restart --max_restarts 2 --n_episodes 50
+```
+
+### Analysis
+
+```bash
+# Failure density analysis (why TAP works on Can/Lift, not Square)
+python scripts/analyze_failure_density.py
+
+# Selective execution curves (success vs coverage)
+python scripts/analyze_selective_execution.py
 ```
 
 ### Headroom Audit (Robomimic)
@@ -200,6 +242,9 @@ TAP-Score/
 │   ├── collect_risk_rollouts.py      # Collect labeled rollout data
 │   ├── eval_tap_detection.py         # Runtime detection eval
 │   ├── eval_abstention.py            # Abstention curve eval
+│   ├── eval_intervention.py          # Resample/restart intervention eval
+│   ├── analyze_selective_execution.py # Success-vs-coverage curves
+│   ├── analyze_failure_density.py    # Failure density analysis (why TAP works)
 │   ├── robomimic_headroom_audit.py   # Oracle best-of-K headroom
 │   ├── run_perturb_sweep.sh          # Perturbation sweep
 │   ├── run_risk_pipeline.sh          # Full risk pipeline

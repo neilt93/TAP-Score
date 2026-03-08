@@ -85,6 +85,7 @@ class RiskTAPScore(nn.Module):
         obs_window: int = 2,
         action_chunk: int = 8,
         hidden_dim: int = 128,
+        obs_only: bool = False,
     ):
         super().__init__()
         self.obs_dim = obs_dim
@@ -92,35 +93,53 @@ class RiskTAPScore(nn.Module):
         self.obs_window = obs_window
         self.action_chunk = action_chunk
         self.hidden_dim = hidden_dim
+        self.obs_only = obs_only
 
         self.obs_encoder = RiskObsEncoder(obs_dim, obs_window, hidden_dim)
-        self.action_encoder = RiskActionEncoder(action_dim, action_chunk, hidden_dim)
+        if not obs_only:
+            self.action_encoder = RiskActionEncoder(action_dim, action_chunk, hidden_dim)
+            risk_input_dim = hidden_dim * 2
+        else:
+            self.action_encoder = None
+            risk_input_dim = hidden_dim
         self.risk_head = nn.Sequential(
-            nn.Linear(hidden_dim * 2, hidden_dim),
+            nn.Linear(risk_input_dim, hidden_dim),
             nn.ReLU(),
             nn.Linear(hidden_dim, 1),
         )
 
-    def forward(self, obs: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
+    def forward(
+        self, obs: torch.Tensor, action: Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
         """
         Args:
             obs:    (B, obs_window, obs_dim)
-            action: (B, action_chunk, action_dim)
+            action: (B, action_chunk, action_dim) — ignored when obs_only=True
         Returns:
             risk_logit: (B,) — raw logit (positive = more likely to fail)
         """
         obs_emb = self.obs_encoder(obs)      # (B, hidden_dim)
-        act_emb = self.action_encoder(action)  # (B, hidden_dim)
-        logit = self.risk_head(torch.cat([obs_emb, act_emb], dim=-1))
+        if self.obs_only:
+            combined = obs_emb
+        else:
+            act_emb = self.action_encoder(action)  # (B, hidden_dim)
+            combined = torch.cat([obs_emb, act_emb], dim=-1)
+        logit = self.risk_head(combined)
         return logit.squeeze(-1)
 
-    def predict_risk(self, obs: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
+    def predict_risk(
+        self, obs: torch.Tensor, action: Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
         """Return P(fail) in [0, 1]."""
         return torch.sigmoid(self.forward(obs, action))
 
-    def encode(self, obs: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
-        """Return per-step embedding (B, hidden_dim * 2) before risk head."""
+    def encode(
+        self, obs: torch.Tensor, action: Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
+        """Return per-step embedding before risk head."""
         obs_emb = self.obs_encoder(obs)      # (B, hidden_dim)
+        if self.obs_only:
+            return obs_emb
         act_emb = self.action_encoder(action)  # (B, hidden_dim)
         return torch.cat([obs_emb, act_emb], dim=-1)
 

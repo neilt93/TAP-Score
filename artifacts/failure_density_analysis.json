@@ -1,0 +1,44 @@
+{
+  "Can": {
+    "n_episodes": 100,
+    "n_success": 45,
+    "n_fail": 55,
+    "fail_rate": 0.55,
+    "auroc_mean": 0.8561616161616161,
+    "auroc_best": 0.8561616161616161,
+    "overlap_coefficient": 0.8902525252525252,
+    "mean_separation": 0.06762064729089959,
+    "success_score_mean": 0.9087482496547323,
+    "failure_score_mean": 0.8411276023638328,
+    "success_score_std": 0.19432376901757423,
+    "failure_score_std": 0.2810177927683852
+  },
+  "Lift": {
+    "n_episodes": 100,
+    "n_success": 47,
+    "n_fail": 53,
+    "fail_rate": 0.53,
+    "auroc_mean": 0.8113207547169811,
+    "auroc_best": 0.8113207547169811,
+    "overlap_coefficient": 0.799146492590718,
+    "mean_separation": 0.053750632715102595,
+    "success_score_mean": 0.4712795682103618,
+    "failure_score_mean": 0.41752893549525916,
+    "success_score_std": 0.2782380493325979,
+    "failure_score_std": 0.22239504906420168
+  },
+  "Square": {
+    "n_episodes": 50,
+    "n_success": 9,
+    "n_fail": 41,
+    "fail_rate": 0.82,
+    "auroc_mean": 0.5149051490514904,
+    "auroc_best": 0.5230352303523036,
+    "overlap_coefficient": 0.2818428184281825,
+    "mean_separation": 0.0057185287851767574,
+    "success_score_mean": 0.8075510221812863,
+    "failure_score_mean": 0.8018324933961095,
+    "success_score_std": 0.03651943237996566,
+    "failure_score_std": 0.07735402361888603
+  }
+}

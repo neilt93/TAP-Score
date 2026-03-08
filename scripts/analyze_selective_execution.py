@@ -90,13 +90,14 @@ def orient_mag_scores(mag, successes):
 
 # ── Figure ───────────────────────────────────────────────────────────────
 
-def make_figure(can, lift, output_dir, score_key="mean_score"):
+def make_figure(can, lift, output_dir, score_key="mean_score",
+                can_obs_only=None, lift_obs_only=None):
     """Create 2-panel selective execution figure."""
     fig, axes = plt.subplots(1, 2, figsize=(10, 4), sharey=True)
 
-    for ax, data, title in [
-        (axes[0], can, f"Can (onset={can['onset']})"),
-        (axes[1], lift, f"Lift (onset={lift['onset']})"),
+    for ax, data, title, obs_data in [
+        (axes[0], can, f"Can (onset={can['onset']})", can_obs_only),
+        (axes[1], lift, f"Lift (onset={lift['onset']})", lift_obs_only),
     ]:
         scores = data[score_key]
         successes = data["success"]
@@ -107,15 +108,25 @@ def make_figure(can, lift, output_dir, score_key="mean_score"):
         cov, sr_tap = compute_selective_curve(scores, successes)
         ci_lo, ci_hi = bootstrap_ci(scores, successes)
         ax.plot(cov * 100, sr_tap, "o-", color="C0", markersize=4,
-                label="TAP risk score", zorder=3)
+                label="TAP (obs+action)", zorder=4)
         ax.fill_between(cov * 100, ci_lo, ci_hi, color="C0", alpha=0.15)
+
+        # Obs-only baseline (if available)
+        if obs_data is not None:
+            obs_scores = obs_data[score_key]
+            obs_succ = obs_data["success"]
+            cov_o, sr_obs = compute_selective_curve(obs_scores, obs_succ)
+            ci_lo_o, ci_hi_o = bootstrap_ci(obs_scores, obs_succ)
+            ax.plot(cov_o * 100, sr_obs, "^-", color="C2", markersize=4,
+                    label="Obs-only baseline", zorder=3)
+            ax.fill_between(cov_o * 100, ci_lo_o, ci_hi_o, color="C2", alpha=0.12)
 
         # Magnitude baseline + CI
         mag_oriented, mag_dir = orient_mag_scores(mag, successes)
         cov_m, sr_mag = compute_selective_curve(mag_oriented, successes)
         ci_lo_m, ci_hi_m = bootstrap_ci(mag_oriented, successes)
         ax.plot(cov_m * 100, sr_mag, "s--", color="C1", markersize=4,
-                label=f"Action magnitude", zorder=2)
+                label="Action magnitude", zorder=2)
         ax.fill_between(cov_m * 100, ci_lo_m, ci_hi_m, color="C1", alpha=0.12)
 
         # Random baseline
@@ -152,12 +163,15 @@ def make_figure(can, lift, output_dir, score_key="mean_score"):
 
 # ── Summary table ────────────────────────────────────────────────────────
 
-def print_summary(can, lift, score_key="mean_score"):
+def print_summary(can, lift, score_key="mean_score",
+                  can_obs_only=None, lift_obs_only=None):
     """Print key numbers at standard coverage levels."""
     print("\nSelective Execution Analysis")
     print("=" * 60)
 
-    for data, name in [(can, "Can"), (lift, "Lift")]:
+    for data, name, obs_data in [
+        (can, "Can", can_obs_only), (lift, "Lift", lift_obs_only),
+    ]:
         scores = data[score_key]
         successes = data["success"]
         mag = data["mean_action_mag"]
@@ -172,20 +186,41 @@ def print_summary(can, lift, score_key="mean_score"):
         auc_mag = auc_selective(cov, sr_mag)
         auc_rand = baseline_sr  # constant line → AUC = baseline_sr * 1.0
 
+        # Obs-only baseline
+        if obs_data is not None:
+            obs_scores = obs_data[score_key]
+            obs_succ = obs_data["success"]
+            _, sr_obs = compute_selective_curve(obs_scores, obs_succ)
+            auc_obs = auc_selective(cov, sr_obs)
+        else:
+            sr_obs = None
+            auc_obs = None
+
         print(f"\n{name} ({data['perturb']}, onset={data['onset']}): "
               f"{data['n_episodes']} episodes "
               f"({data['n_success']} success, {data['n_fail']} fail)")
         print(f"  Mag baseline direction: {mag_dir}")
-        print(f"  {'Coverage':>10s}  {'TAP':>7s}  {'Mag':>7s}  {'Random':>7s}")
+
+        header = f"  {'Coverage':>10s}  {'TAP':>7s}"
+        if sr_obs is not None:
+            header += f"  {'ObsOnly':>7s}"
+        header += f"  {'Mag':>7s}  {'Random':>7s}"
+        print(header)
 
         targets = [0.10, 0.20, 0.30, 0.50, 1.00]
         for t in targets:
             idx = np.argmin(np.abs(cov - t))
-            print(f"  {cov[idx]:>9.0%}  {sr_tap[idx]:>7.1%}  "
-                  f"{sr_mag[idx]:>7.1%}  {baseline_sr:>7.1%}")
+            row = f"  {cov[idx]:>9.0%}  {sr_tap[idx]:>7.1%}"
+            if sr_obs is not None:
+                row += f"  {sr_obs[idx]:>7.1%}"
+            row += f"  {sr_mag[idx]:>7.1%}  {baseline_sr:>7.1%}"
+            print(row)
 
-        print(f"  AUC-SE: TAP={auc_tap:.3f}  Mag={auc_mag:.3f}  "
-              f"Random={auc_rand:.3f}")
+        summary_line = f"  AUC-SE: TAP={auc_tap:.3f}"
+        if auc_obs is not None:
+            summary_line += f"  ObsOnly={auc_obs:.3f}"
+        summary_line += f"  Mag={auc_mag:.3f}  Random={auc_rand:.3f}"
+        print(summary_line)
 
 
 # ── Main ─────────────────────────────────────────────────────────────────
@@ -199,6 +234,10 @@ def main():
     parser.add_argument("--lift",
         default="eval_results/risk_detection_lift_zero31_epwin_n100.json",
         help="Lift eval JSON path")
+    parser.add_argument("--can_obs_only", default=None,
+        help="Can obs-only baseline eval JSON path")
+    parser.add_argument("--lift_obs_only", default=None,
+        help="Lift obs-only baseline eval JSON path")
     parser.add_argument("--output_dir", default="artifacts/",
         help="Output directory for figures")
     parser.add_argument("--score_key", default="mean_score",
@@ -209,8 +248,11 @@ def main():
     can = load_episode_data(args.can)
     lift = load_episode_data(args.lift)
 
-    print_summary(can, lift, args.score_key)
-    make_figure(can, lift, args.output_dir, args.score_key)
+    can_obs = load_episode_data(args.can_obs_only) if args.can_obs_only else None
+    lift_obs = load_episode_data(args.lift_obs_only) if args.lift_obs_only else None
+
+    print_summary(can, lift, args.score_key, can_obs, lift_obs)
+    make_figure(can, lift, args.output_dir, args.score_key, can_obs, lift_obs)
 
 
 if __name__ == "__main__":

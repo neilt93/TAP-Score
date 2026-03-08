@@ -53,6 +53,8 @@ def parse_args():
                         help="Only train on post-onset steps (skip pre-onset)")
     parser.add_argument("--balanced", action="store_true",
                         help="Use class-balanced sampling (50/50 pos/neg)")
+    parser.add_argument("--obs_only", action="store_true",
+                        help="Train obs-only baseline (no action encoder)")
     parser.add_argument("--val_split", type=float, default=0.1)
     parser.add_argument("--device", type=str, default="cuda" if torch.cuda.is_available() else "cpu")
     return parser.parse_args()
@@ -81,6 +83,7 @@ def main():
     print(f"Post-onset only:{args.post_onset_only}")
     print(f"Balanced:       {args.balanced}")
     print(f"Hard mining at: epoch {args.hard_mining_epoch}")
+    print(f"Obs-only:       {args.obs_only}")
     print(f"Device:         {device}")
 
     # ── Load dataset ─────────────────────────────────────────────────
@@ -140,6 +143,7 @@ def main():
         obs_window=args.obs_window,
         action_chunk=args.action_chunk,
         hidden_dim=args.hidden_dim,
+        obs_only=args.obs_only,
     ).to(device)
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=1e-4)
@@ -149,7 +153,10 @@ def main():
     # ── Checkpoint path ──────────────────────────────────────────────
     ckpt_dir = Path(f"checkpoints_contrastive/{benchmark_name}")
     ckpt_dir.mkdir(parents=True, exist_ok=True)
-    best_path = ckpt_dir / "risk_tap_best.pt"
+    best_path = ckpt_dir / f"risk_tap{ckpt_suffix}_best.pt"
+
+    # Checkpoint path includes obs_only suffix if applicable
+    ckpt_suffix = "_obs_only" if args.obs_only else ""
 
     config = {
         "model_type": "risk",
@@ -162,6 +169,7 @@ def main():
         "task": args.task,
         "regimes": args.regimes,
         "label_mode": args.label_mode,
+        "obs_only": args.obs_only,
     }
 
     best_val_auroc = 0.0

@@ -172,12 +172,14 @@ def main():
         from tap.risk import RiskTAPScore
         risk_ckpt = torch.load(args.tap_checkpoint, map_location=device, weights_only=False)
         risk_config = risk_ckpt["config"]
+        risk_obs_only = risk_config.get("obs_only", False)
         tap_model = RiskTAPScore(
             obs_dim=risk_config["obs_dim"],
             action_dim=risk_config["action_dim"],
             obs_window=risk_config.get("obs_window", 2),
             action_chunk=risk_config.get("action_chunk", 8),
             hidden_dim=risk_config.get("hidden_dim", 128),
+            obs_only=risk_obs_only,
         )
         tap_model.load_state_dict(risk_ckpt["model_state_dict"])
         tap_model.to(device)
@@ -185,7 +187,8 @@ def main():
         tap_config = risk_config
         tap_action_chunk = risk_config.get("action_chunk", 8)
         tap_obs_window = risk_config.get("obs_window", 2)
-        print(f"  Risk model loaded (fail_horizon={risk_config.get('fail_horizon', '?')})")
+        print(f"  Risk model loaded (fail_horizon={risk_config.get('fail_horizon', '?')}"
+              f", obs_only={risk_obs_only})")
     else:
         tap_model, tap_config = load_model(args.tap_checkpoint, device)
         tap_action_chunk = tap_config.get("action_chunk", 16)
@@ -353,7 +356,8 @@ def main():
 
                     if use_risk_model:
                         obs_t = torch.from_numpy(obs_window).unsqueeze(0).to(device, dtype=torch.float32)
-                        act_t = torch.from_numpy(tap_action).unsqueeze(0).to(device, dtype=torch.float32)
+                        act_t = (None if getattr(tap_model, 'obs_only', False) else
+                                 torch.from_numpy(tap_action).unsqueeze(0).to(device, dtype=torch.float32))
                         with torch.no_grad():
                             risk_prob = tap_model.predict_risk(obs_t, act_t)
                         score = 1.0 - risk_prob.item()  # higher = safer
