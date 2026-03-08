@@ -56,6 +56,7 @@ def parse_args():
     parser.add_argument("--obs_only", action="store_true",
                         help="Train obs-only baseline (no action encoder)")
     parser.add_argument("--val_split", type=float, default=0.1)
+    parser.add_argument("--seed", type=int, default=42, help="Random seed for reproducibility")
     parser.add_argument("--device", type=str, default="cuda" if torch.cuda.is_available() else "cpu")
     return parser.parse_args()
 
@@ -63,6 +64,12 @@ def parse_args():
 def main():
     args = parse_args()
     device = torch.device(args.device)
+
+    # Set random seeds for reproducibility
+    np.random.seed(args.seed)
+    torch.manual_seed(args.seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(args.seed)
 
     # Determine obs_dim and action_dim from benchmark config
     benchmark_name = f"robomimic_{args.task.lower()}_lowdim"
@@ -153,10 +160,8 @@ def main():
     # ── Checkpoint path ──────────────────────────────────────────────
     ckpt_dir = Path(f"checkpoints_contrastive/{benchmark_name}")
     ckpt_dir.mkdir(parents=True, exist_ok=True)
-    best_path = ckpt_dir / f"risk_tap{ckpt_suffix}_best.pt"
-
-    # Checkpoint path includes obs_only suffix if applicable
     ckpt_suffix = "_obs_only" if args.obs_only else ""
+    best_path = ckpt_dir / f"risk_tap{ckpt_suffix}_best.pt"
 
     config = {
         "model_type": "risk",
@@ -183,17 +188,23 @@ def main():
             hard_indices_in_full = mine_hard_negatives(
                 model, full_dataset, device, top_k_ratio=0.3,
             )
-            # Map to train subset indices
-            train_set = set(train_indices)
+            # Map to train subset indices (O(1) lookup)
+            train_idx_to_pos = {idx: pos for pos, idx in enumerate(train_indices)}
             hard_in_train = [
-                train_indices.index(idx) for idx in hard_indices_in_full
-                if idx in train_set
+                train_idx_to_pos[idx] for idx in hard_indices_in_full
+                if idx in train_idx_to_pos
             ]
             if len(hard_in_train) > 0:
-                # Build weighted sampler for train_dataset (Subset)
-                weights = np.ones(len(train_dataset), dtype=np.float64)
+                # Build weighted sampler preserving balanced weights if active
+                if args.balanced:
+                    weights = np.ones(len(train_dataset), dtype=np.float64)
+                    for i, idx in enumerate(train_indices):
+                        if full_dataset.all_samples[idx]["label"] > 0.5:
+                            weights[i] = max(1.0, n_safe_train / max(n_train_fail, 1))
+                else:
+                    weights = np.ones(len(train_dataset), dtype=np.float64)
                 for hi in hard_in_train:
-                    weights[hi] = 3.0
+                    weights[hi] *= 3.0
                 sampler = WeightedRandomSampler(weights, num_samples=len(train_dataset), replacement=True)
                 train_loader = DataLoader(
                     train_dataset, batch_size=args.batch_size,

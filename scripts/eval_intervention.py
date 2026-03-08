@@ -285,8 +285,8 @@ def run_episode(
         if episode_return >= 1.0:
             episode_success = True
 
-        # If not restarted (or out of restarts), break outer loop
-        if not restarted or restarts_used >= max_restarts:
+        # If not restarted, this attempt completed normally — done
+        if not restarted:
             break
 
         total_resamples += ep_resamples

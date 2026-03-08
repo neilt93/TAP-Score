@@ -359,14 +359,17 @@ def print_summary(tasks: dict):
         print(f"  Post-onset sep:  {post_sep:.4f}")
 
         if dist["success"]["mean"] is not None and dist["failure"]["mean"] is not None:
-            d_prime = abs(dist["success"]["mean"] - dist["failure"]["mean"]) / (
-                (dist["success"]["std"] + dist["failure"]["std"]) / 2 + 1e-8
-            )
+            s1, s2 = dist["success"]["std"], dist["failure"]["std"]
+            n1, n2 = max(dist["success"]["n"], 1), max(dist["failure"]["n"], 1)
+            pooled_std = np.sqrt(((n1 - 1) * s1**2 + (n2 - 1) * s2**2) / max(n1 + n2 - 2, 1))
+            d_prime = abs(dist["success"]["mean"] - dist["failure"]["mean"]) / (pooled_std + 1e-8)
             print(f"  d' (Cohen):      {d_prime:.3f}")
-        print(f"  Success scores:  mean={dist['success']['mean']:.3f}, "
-              f"std={dist['success']['std']:.3f}" if dist['success']['mean'] else "")
-        print(f"  Failure scores:  mean={dist['failure']['mean']:.3f}, "
-              f"std={dist['failure']['std']:.3f}" if dist['failure']['mean'] else "")
+        if dist['success']['mean'] is not None:
+            print(f"  Success scores:  mean={dist['success']['mean']:.3f}, "
+                  f"std={dist['success']['std']:.3f}")
+        if dist['failure']['mean'] is not None:
+            print(f"  Failure scores:  mean={dist['failure']['mean']:.3f}, "
+                  f"std={dist['failure']['std']:.3f}")
 
     # Comparative insight
     print("\n" + "-" * 70)
@@ -380,14 +383,17 @@ def print_summary(tasks: dict):
             continue
         dist = tasks[name]["dist_stats"]
         if dist["success"]["mean"] is not None and dist["failure"]["mean"] is not None:
-            d_step = abs(dist["success"]["mean"] - dist["failure"]["mean"]) / (
-                (dist["success"]["std"] + dist["failure"]["std"]) / 2 + 1e-8)
+            s1, s2 = dist["success"]["std"], dist["failure"]["std"]
+            n1, n2 = max(dist["success"]["n"], 1), max(dist["failure"]["n"], 1)
+            pooled_std = np.sqrt(((n1 - 1) * s1**2 + (n2 - 1) * s2**2) / max(n1 + n2 - 2, 1))
+            d_step = abs(dist["success"]["mean"] - dist["failure"]["mean"]) / (pooled_std + 1e-8)
             # Use n_scores from episode data if available (actual steps per ep)
             ep_results = tasks[name]["episode_data"].get("episode_results", [])
             n_scores_list = [e.get("n_scores", 1) for e in ep_results
                              if e.get("n_scores") is not None]
-            n_per_ep = int(np.median(n_scores_list)) if n_scores_list else max(
-                1, dist["success"]["n"] // tasks[name]["episode_data"]["n_success"])
+            n_success_ep = tasks[name]["episode_data"].get("n_success", 0)
+            n_per_ep = int(np.median(n_scores_list)) if n_scores_list else (
+                max(1, dist["success"]["n"] // n_success_ep) if n_success_ep > 0 else 1)
             # For Square, d' is already episode-level (we only have mean scores)
             is_episode_level = "note" in tasks[name]
             if is_episode_level:

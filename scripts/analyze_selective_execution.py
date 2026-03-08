@@ -190,10 +190,11 @@ def print_summary(can, lift, score_key="mean_score",
         if obs_data is not None:
             obs_scores = obs_data[score_key]
             obs_succ = obs_data["success"]
-            _, sr_obs = compute_selective_curve(obs_scores, obs_succ)
-            auc_obs = auc_selective(cov, sr_obs)
+            cov_obs, sr_obs = compute_selective_curve(obs_scores, obs_succ)
+            auc_obs = auc_selective(cov_obs, sr_obs)
         else:
             sr_obs = None
+            cov_obs = None
             auc_obs = None
 
         print(f"\n{name} ({data['perturb']}, onset={data['onset']}): "
@@ -212,7 +213,8 @@ def print_summary(can, lift, score_key="mean_score",
             idx = np.argmin(np.abs(cov - t))
             row = f"  {cov[idx]:>9.0%}  {sr_tap[idx]:>7.1%}"
             if sr_obs is not None:
-                row += f"  {sr_obs[idx]:>7.1%}"
+                idx_obs = np.argmin(np.abs(cov_obs - t))
+                row += f"  {sr_obs[idx_obs]:>7.1%}"
             row += f"  {sr_mag[idx]:>7.1%}  {baseline_sr:>7.1%}"
             print(row)
 

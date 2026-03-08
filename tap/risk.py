@@ -166,7 +166,7 @@ class TemporalRiskModel(nn.Module):
             for p in self.step_model.parameters():
                 p.requires_grad = False
 
-        emb_dim = step_model.hidden_dim * 2  # concat of obs + action embeddings
+        emb_dim = step_model.hidden_dim if step_model.obs_only else step_model.hidden_dim * 2
         self.gru = nn.GRU(emb_dim, gru_hidden, num_layers=gru_layers, batch_first=True)
         # Per-step risk head (from GRU hidden state)
         self.step_head = nn.Linear(gru_hidden, 1)

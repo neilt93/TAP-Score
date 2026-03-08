@@ -10,7 +10,7 @@
 #   - Existing risk model checkpoints in checkpoints_contrastive/
 #
 # Usage: bash scripts/runpod/run_extensions.sh
-set -e
+set -eo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$REPO_ROOT"

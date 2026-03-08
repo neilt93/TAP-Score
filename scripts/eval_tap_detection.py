@@ -473,10 +473,6 @@ def main():
     if hasattr(env, "close"):
         env.close()
 
-    # Clean up checkpoint after successful completion.
-    if ckpt_path.exists():
-        ckpt_path.unlink()
-
     # ── Write CSV ────────────────────────────────────────────────────
     output_path = Path(args.output)
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -503,6 +499,7 @@ def main():
             "lead_time": None,
             "perturb": args.perturb,
             "perturb_start_step": args.perturb_start_step,
+            "episode_results": episode_results,
         }
     else:
         from sklearn.metrics import roc_auc_score, average_precision_score
@@ -624,10 +621,10 @@ def main():
         boot_ci = {}
         if boot_aurocs:
             ci_lo, ci_hi = np.percentile(boot_aurocs, [2.5, 97.5])
-            boot_ci["auroc_min"] = {"mean": float(np.mean(boot_aurocs)),
-                                     "ci_lo": float(ci_lo), "ci_hi": float(ci_hi)}
+            boot_ci[f"auroc_{best_agg}"] = {"mean": float(np.mean(boot_aurocs)),
+                                             "ci_lo": float(ci_lo), "ci_hi": float(ci_hi)}
             print(f"\n  Bootstrap 95% CI (n={n_boot}):")
-            print(f"    AUROC (min):       {np.mean(boot_aurocs):.3f} [{ci_lo:.3f}, {ci_hi:.3f}]")
+            print(f"    AUROC ({best_agg}):       {np.mean(boot_aurocs):.3f} [{ci_lo:.3f}, {ci_hi:.3f}]")
         if boot_succ_at_20:
             ci_lo, ci_hi = np.percentile(boot_succ_at_20, [2.5, 97.5])
             boot_ci["success_at_20pct"] = {"mean": float(np.mean(boot_succ_at_20)),
@@ -762,6 +759,10 @@ def main():
         json.dump(summary, f, indent=2)
     print(f"\nJSON summary: {json_path}")
 
+    # Clean up checkpoint after successful final writes
+    if ckpt_path.exists():
+        ckpt_path.unlink()
+
     # ── Final summary ────────────────────────────────────────────────
     print("\n" + "=" * 70)
     print("DETECTION EVALUATION SUMMARY")
@@ -780,8 +781,10 @@ def main():
             print(f"  Mag baseline:   {summary['mag_baseline_auroc']:.3f}")
         if summary.get("bootstrap_ci"):
             ci = summary["bootstrap_ci"]
-            if "auroc_min" in ci:
-                a = ci["auroc_min"]
+            best_agg_name = summary.get("best_aggregation", "min")
+            ci_key = f"auroc_{best_agg_name}"
+            if ci_key in ci:
+                a = ci[ci_key]
                 print(f"  AUROC 95% CI:   [{a['ci_lo']:.3f}, {a['ci_hi']:.3f}]")
     print("=" * 70)
 
