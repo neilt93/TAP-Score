@@ -1,0 +1,309 @@
+{
+  "meta": {
+    "script": "scripts/robomimic_headroom_audit.py",
+    "timestamp_unix": 1772516603.9208238,
+    "elapsed_sec": 546.3896146999905
+  },
+  "config": {
+    "dp_checkpoint": "data\\robomimic\\checkpoints\\lift_ph_diffusion_policy_cnn.ckpt",
+    "policy_class": "DiffusionUnetLowdimPolicy",
+    "policy_target": "diffusion_policy.workspace.train_diffusion_unet_lowdim_workspace.TrainDiffusionUnetLowdimWorkspace",
+    "horizon": 16,
+    "task_name": "lift",
+    "dataset_path": "C:\\Users\\neilt\\OneDrive\\Documents\\TAP-Score\\data\\robomimic\\datasets\\lift\\ph\\low_dim_abs.hdf5",
+    "env_mode": "lowdim",
+    "device": "cuda",
+    "tap_git_hash": "1581336",
+    "dp_git_hash": "5ba07ac",
+    "n_episodes": 20,
+    "K": 1,
+    "n_obs_steps": 2,
+    "n_action_steps": 8,
+    "n_latency_steps": 0,
+    "decision_interval": 999,
+    "skip_first": 999999,
+    "max_env_steps": 400,
+    "seed_offset": 0,
+    "continuation_seed": 12345,
+    "abs_action": true,
+    "kp": 500.0,
+    "reset_to_dataset_init": true,
+    "branch_horizon": null,
+    "eval_oracle_policy": false,
+    "log_candidates": false,
+    "thresholds": {
+      "headroom_fraction_of_return_range": 0.01,
+      "success_gain_points": 0.02
+    }
+  },
+  "global_metrics": {
+    "n_decision_points": 0,
+    "candidate_return_range": {
+      "min": NaN,
+      "max": NaN,
+      "range": 0.0
+    },
+    "candidate_spread_l2_mean_pairwise": {
+      "mean": NaN,
+      "ci95_low": NaN,
+      "ci95_high": NaN,
+      "n": 0
+    },
+    "oracle_headroom_best_minus_mean": {
+      "mean": NaN,
+      "ci95_low": NaN,
+      "ci95_high": NaN,
+      "n": 0
+    },
+    "oracle_headroom_best_minus_k0": {
+      "mean": NaN,
+      "ci95_low": NaN,
+      "ci95_high": NaN,
+      "n": 0
+    },
+    "decision_success_k0": {
+      "mean": NaN,
+      "ci95_low": NaN,
+      "ci95_high": NaN,
+      "n": 0
+    },
+    "decision_success_oracle": {
+      "mean": NaN,
+      "ci95_low": NaN,
+      "ci95_high": NaN,
+      "n": 0
+    },
+    "decision_success_gain_oracle_minus_k0": {
+      "mean": NaN,
+      "ci95_low": NaN,
+      "ci95_high": NaN,
+      "n": 0
+    },
+    "episode_success_k1": {
+      "mean": 1.0,
+      "ci95_low": 1.0,
+      "ci95_high": 1.0,
+      "n": 20
+    },
+    "episode_return_k1": {
+      "mean": 26.6,
+      "ci95_low": 23.867074981289328,
+      "ci95_high": 29.332925018710675,
+      "n": 20
+    },
+    "episode_success_oracle_policy": null,
+    "episode_return_oracle_policy": null,
+    "episode_success_gain_oracle_minus_k1": null,
+    "gate_metrics": {
+      "headroom_threshold_abs": 0.0,
+      "success_gain_threshold": 0.02,
+      "success_gain_source": "decision_to_go"
+    },
+    "fork_decision": "inconclusive",
+    "recommendation": "Signal is mixed. Run more episodes or tighten evaluation controls."
+  },
+  "episodes": [
+    {
+      "seed": 0,
+      "episode_return": 27.0,
+      "episode_success": true,
+      "n_decision_points": 0,
+      "mean_candidate_spread": 0.0,
+      "mean_oracle_headroom_best_minus_mean": 0.0,
+      "mean_oracle_headroom_best_minus_k0": 0.0,
+      "mean_decision_success_gain_oracle_minus_k0": 0.0
+    },
+    {
+      "seed": 1,
+      "episode_return": 27.0,
+      "episode_success": true,
+      "n_decision_points": 0,
+      "mean_candidate_spread": 0.0,
+      "mean_oracle_headroom_best_minus_mean": 0.0,
+      "mean_oracle_headroom_best_minus_k0": 0.0,
+      "mean_decision_success_gain_oracle_minus_k0": 0.0
+    },
+    {
+      "seed": 2,
+      "episode_return": 27.0,
+      "episode_success": true,
+      "n_decision_points": 0,
+      "mean_candidate_spread": 0.0,
+      "mean_oracle_headroom_best_minus_mean": 0.0,
+      "mean_oracle_headroom_best_minus_k0": 0.0,
+      "mean_decision_success_gain_oracle_minus_k0": 0.0
+    },
+    {
+      "seed": 3,
+      "episode_return": 36.0,
+      "episode_success": true,
+      "n_decision_points": 0,
+      "mean_candidate_spread": 0.0,
+      "mean_oracle_headroom_best_minus_mean": 0.0,
+      "mean_oracle_headroom_best_minus_k0": 0.0,
+      "mean_decision_success_gain_oracle_minus_k0": 0.0
+    },
+    {
+      "seed": 4,
+      "episode_return": 31.0,
+      "episode_success": true,
+      "n_decision_points": 0,
+      "mean_candidate_spread": 0.0,
+      "mean_oracle_headroom_best_minus_mean": 0.0,
+      "mean_oracle_headroom_best_minus_k0": 0.0,
+      "mean_decision_success_gain_oracle_minus_k0": 0.0
+    },
+    {
+      "seed": 5,
+      "episode_return": 30.0,
+      "episode_success": true,
+      "n_decision_points": 0,
+      "mean_candidate_spread": 0.0,
+      "mean_oracle_headroom_best_minus_mean": 0.0,
+      "mean_oracle_headroom_best_minus_k0": 0.0,
+      "mean_decision_success_gain_oracle_minus_k0": 0.0
+    },
+    {
+      "seed": 6,
+      "episode_return": 32.0,
+      "episode_success": true,
+      "n_decision_points": 0,
+      "mean_candidate_spread": 0.0,
+      "mean_oracle_headroom_best_minus_mean": 0.0,
+      "mean_oracle_headroom_best_minus_k0": 0.0,
+      "mean_decision_success_gain_oracle_minus_k0": 0.0
+    },
+    {
+      "seed": 7,
+      "episode_return": 35.0,
+      "episode_success": true,
+      "n_decision_points": 0,
+      "mean_candidate_spread": 0.0,
+      "mean_oracle_headroom_best_minus_mean": 0.0,
+      "mean_oracle_headroom_best_minus_k0": 0.0,
+      "mean_decision_success_gain_oracle_minus_k0": 0.0
+    },
+    {
+      "seed": 8,
+      "episode_return": 26.0,
+      "episode_success": true,
+      "n_decision_points": 0,
+      "mean_candidate_spread": 0.0,
+      "mean_oracle_headroom_best_minus_mean": 0.0,
+      "mean_oracle_headroom_best_minus_k0": 0.0,
+      "mean_decision_success_gain_oracle_minus_k0": 0.0
+    },
+    {
+      "seed": 9,
+      "episode_return": 9.0,
+      "episode_success": true,
+      "n_decision_points": 0,
+      "mean_candidate_spread": 0.0,
+      "mean_oracle_headroom_best_minus_mean": 0.0,
+      "mean_oracle_headroom_best_minus_k0": 0.0,
+      "mean_decision_success_gain_oracle_minus_k0": 0.0
+    },
+    {
+      "seed": 10,
+      "episode_return": 27.0,
+      "episode_success": true,
+      "n_decision_points": 0,
+      "mean_candidate_spread": 0.0,
+      "mean_oracle_headroom_best_minus_mean": 0.0,
+      "mean_oracle_headroom_best_minus_k0": 0.0,
+      "mean_decision_success_gain_oracle_minus_k0": 0.0
+    },
+    {
+      "seed": 11,
+      "episode_return": 34.0,
+      "episode_success": true,
+      "n_decision_points": 0,
+      "mean_candidate_spread": 0.0,
+      "mean_oracle_headroom_best_minus_mean": 0.0,
+      "mean_oracle_headroom_best_minus_k0": 0.0,
+      "mean_decision_success_gain_oracle_minus_k0": 0.0
+    },
+    {
+      "seed": 12,
+      "episode_return": 25.0,
+      "episode_success": true,
+      "n_decision_points": 0,
+      "mean_candidate_spread": 0.0,
+      "mean_oracle_headroom_best_minus_mean": 0.0,
+      "mean_oracle_headroom_best_minus_k0": 0.0,
+      "mean_decision_success_gain_oracle_minus_k0": 0.0
+    },
+    {
+      "seed": 13,
+      "episode_return": 20.0,
+      "episode_success": true,
+      "n_decision_points": 0,
+      "mean_candidate_spread": 0.0,
+      "mean_oracle_headroom_best_minus_mean": 0.0,
+      "mean_oracle_headroom_best_minus_k0": 0.0,
+      "mean_decision_success_gain_oracle_minus_k0": 0.0
+    },
+    {
+      "seed": 14,
+      "episode_return": 21.0,
+      "episode_success": true,
+      "n_decision_points": 0,
+      "mean_candidate_spread": 0.0,
+      "mean_oracle_headroom_best_minus_mean": 0.0,
+      "mean_oracle_headroom_best_minus_k0": 0.0,
+      "mean_decision_success_gain_oracle_minus_k0": 0.0
+    },
+    {
+      "seed": 15,
+      "episode_return": 26.0,
+      "episode_success": true,
+      "n_decision_points": 0,
+      "mean_candidate_spread": 0.0,
+      "mean_oracle_headroom_best_minus_mean": 0.0,
+      "mean_oracle_headroom_best_minus_k0": 0.0,
+      "mean_decision_success_gain_oracle_minus_k0": 0.0
+    },
+    {
+      "seed": 16,
+      "episode_return": 30.0,
+      "episode_success": true,
+      "n_decision_points": 0,
+      "mean_candidate_spread": 0.0,
+      "mean_oracle_headroom_best_minus_mean": 0.0,
+      "mean_oracle_headroom_best_minus_k0": 0.0,
+      "mean_decision_success_gain_oracle_minus_k0": 0.0
+    },
+    {
+      "seed": 17,
+      "episode_return": 27.0,
+      "episode_success": true,
+      "n_decision_points": 0,
+      "mean_candidate_spread": 0.0,
+      "mean_oracle_headroom_best_minus_mean": 0.0,
+      "mean_oracle_headroom_best_minus_k0": 0.0,
+      "mean_decision_success_gain_oracle_minus_k0": 0.0
+    },
+    {
+      "seed": 18,
+      "episode_return": 22.0,
+      "episode_success": true,
+      "n_decision_points": 0,
+      "mean_candidate_spread": 0.0,
+      "mean_oracle_headroom_best_minus_mean": 0.0,
+      "mean_oracle_headroom_best_minus_k0": 0.0,
+      "mean_decision_success_gain_oracle_minus_k0": 0.0
+    },
+    {
+      "seed": 19,
+      "episode_return": 20.0,
+      "episode_success": true,
+      "n_decision_points": 0,
+      "mean_candidate_spread": 0.0,
+      "mean_oracle_headroom_best_minus_mean": 0.0,
+      "mean_oracle_headroom_best_minus_k0": 0.0,
+      "mean_decision_success_gain_oracle_minus_k0": 0.0
+    }
+  ],
+  "oracle_policy_episodes": null,
+  "decision_points": []
+}

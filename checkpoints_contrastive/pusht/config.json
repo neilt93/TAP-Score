@@ -2,9 +2,10 @@
   "obs_channels": 3,
   "action_dim": 2,
   "obs_window": 2,
-  "action_chunk": 8,
+  "action_chunk": 16,
   "hidden_dim": 128,
-  "temperature": 0.2,
+  "temperature": 0.1,
   "obs_type": "image",
-  "obs_dim": null
+  "obs_dim": null,
+  "use_deltas": false
 }

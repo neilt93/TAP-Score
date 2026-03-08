@@ -14,9 +14,14 @@ checkpoints/
 checkpoints_aug/
 checkpoints_aug_light/
 checkpoints_contrastive/
+checkpoints_contrastive_mixture/
 
 # Baselines (cloned repo)
 baselines/
+
+# Logs and intermediates
+logs/
+*.ckpt.json
 
 # IDE
 .idea/
@@ -31,5 +36,5 @@ Thumbs.db
 # Jupyter
 .ipynb_checkpoints/
 
-# Claude Code config (local only)
-CLAUDE.md
+# Built artifacts
+main.pdf

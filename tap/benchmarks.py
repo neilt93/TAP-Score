@@ -70,6 +70,19 @@ BENCHMARKS = {
         "obs_keys": ["object", "robot0_eef_pos", "robot0_eef_quat", "robot0_gripper_qpos"],
         "description": "7-DoF robotic can-picking task (state observations)",
     },
+    "robomimic_square_lowdim": {
+        "name": "Square (lowdim)",
+        "action_dim": 7,
+        "obs_type": "state",
+        "obs_dim": 23,  # object(14) + eef_pos(3) + eef_quat(4) + gripper_qpos(2) — same as Can
+        "obs_window": 2,
+        "action_chunk": 10,
+        "data_format": "hdf5",
+        "data_subdir": "robomimic/datasets/square/ph",
+        "hdf5_file": "low_dim.hdf5",
+        "obs_keys": ["object", "robot0_eef_pos", "robot0_eef_quat", "robot0_gripper_qpos"],
+        "description": "7-DoF robotic nut-assembly (square) task (state observations)",
+    },
 }
 
 
@@ -83,7 +96,11 @@ def get_benchmark_config(benchmark: str) -> dict:
 def get_data_path(benchmark: str, data_root: str = "data/processed") -> Path:
     """Get the data path for a benchmark."""
     config = get_benchmark_config(benchmark)
-    base_path = Path(data_root) / config["data_subdir"]
+    # HDF5 benchmarks (robomimic) live under data/ not data/processed/
+    if config.get("data_format") == "hdf5":
+        base_path = Path("data") / config["data_subdir"]
+    else:
+        base_path = Path(data_root) / config["data_subdir"]
 
     # If zarr_file or hdf5_file is specified, append it to the path
     if "zarr_file" in config:

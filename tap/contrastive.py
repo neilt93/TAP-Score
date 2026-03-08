@@ -12,6 +12,8 @@ because the same negative actions appear across many observations.
 Supports both image-based (CNN) and state-based (MLP) observations.
 """
 
+import math
+
 import numpy as np
 import torch
 import torch.nn as nn
@@ -19,6 +21,58 @@ import torch.nn.functional as F
 from torch.utils.data import Dataset
 import zarr
 from pathlib import Path
+
+
+class ObservationAugmentor:
+    """Apply random augmentations to observations during training.
+
+    This teaches TAP that correct actions should still score high
+    even if lighting/noise changes - preventing "pixel shift detector" behavior.
+    """
+
+    def __init__(self, p=0.3):
+        self.p = p
+
+    def __call__(self, obs):
+        """
+        Args:
+            obs: (T, C, H, W) observation window, values in [0, 1]
+        Returns:
+            augmented obs with same shape
+        """
+        obs = obs.copy()
+
+        if np.random.rand() < self.p:
+            factor = np.random.uniform(0.8, 1.2)
+            obs = np.clip(obs * factor, 0, 1)
+
+        if np.random.rand() < self.p:
+            noise_std = np.random.uniform(0.01, 0.08)
+            noise = np.random.randn(*obs.shape).astype(np.float32) * noise_std
+            obs = np.clip(obs + noise, 0, 1)
+
+        if np.random.rand() < self.p:
+            T, C, H, W = obs.shape
+            cut_size = np.random.randint(5, 15)
+            x = np.random.randint(0, W - cut_size)
+            y = np.random.randint(0, H - cut_size)
+            obs[:, :, y:y+cut_size, x:x+cut_size] = 0
+
+        if np.random.rand() < self.p:
+            T, C, H, W = obs.shape
+            shift_x = np.random.randint(-3, 4)
+            shift_y = np.random.randint(-3, 4)
+            new_obs = np.zeros_like(obs)
+            src_x = max(0, shift_x)
+            src_y = max(0, shift_y)
+            dst_x = max(0, -shift_x)
+            dst_y = max(0, -shift_y)
+            w = W - abs(shift_x)
+            h = H - abs(shift_y)
+            new_obs[:, :, dst_y:dst_y+h, dst_x:dst_x+w] = obs[:, :, src_y:src_y+h, src_x:src_x+w]
+            obs = new_obs
+
+        return obs.astype(np.float32)
 
 
 class ContrastiveObsEncoder(nn.Module):
@@ -187,6 +241,7 @@ class ContrastiveTAPScore(nn.Module):
         temperature=0.1,
         obs_type='image',  # 'image' or 'state'
         obs_dim=None,  # Required if obs_type='state'
+        learnable_temperature=False,
         **kwargs,  # Additional options like use_deltas
     ):
         super().__init__()
@@ -194,9 +249,15 @@ class ContrastiveTAPScore(nn.Module):
         self.obs_window = obs_window
         self.action_chunk = action_chunk
         self.hidden_dim = hidden_dim
-        self.temperature = temperature
         self.obs_type = obs_type
         self.use_deltas = kwargs.get('use_deltas', False)
+        self.learnable_temperature = learnable_temperature
+
+        if learnable_temperature:
+            # Log-space parameterization: ensures positivity, smooth gradients.
+            self.log_temperature = nn.Parameter(torch.tensor(math.log(temperature)))
+        else:
+            self.temperature = temperature
 
         # Choose encoder based on observation type
         if obs_type == 'image':
@@ -232,9 +293,20 @@ class ContrastiveTAPScore(nn.Module):
         # obs_emb: (B, hidden_dim) -> (B, 1, hidden_dim)
         # action_embs: (B, M, hidden_dim)
         logits = torch.bmm(action_embs, obs_emb.unsqueeze(-1)).squeeze(-1)  # (B, M)
-        logits = logits / self.temperature
+
+        if self.learnable_temperature:
+            temp = self.log_temperature.exp().clamp(0.01, 1.0)
+        else:
+            temp = self.temperature
+        logits = logits / temp
 
         return logits
+
+    def get_temperature(self):
+        """Return current temperature value (useful for logging)."""
+        if self.learnable_temperature:
+            return self.log_temperature.exp().clamp(0.01, 1.0).item()
+        return self.temperature
 
     def get_loss(self, obs, actions):
         """
@@ -349,7 +421,6 @@ class ContrastiveTAPDataset(Dataset):
 
         # Simple augmentation
         if augment:
-            from .dataset import ObservationAugmentor
             self.augmentor = ObservationAugmentor(p=augment_prob)
         else:
             self.augmentor = None
@@ -831,8 +902,284 @@ class ContrastiveHDF5StateTAPDataset(Dataset):
         }
 
 
+class ContrastiveDPNegDataset(Dataset):
+    """
+    Dataset for contrastive TAP training with cross-observation DP negatives.
+
+    Loads from a pre-built NPZ cache (built by build_dp_neg_cache_robomimic.py).
+    Zero synthetic data — all actions are real DP proposals.
+
+    Key design: positive = DP proposal from THIS observation, negatives = DP
+    proposals from OTHER observations.  Forces observation-conditioned scoring
+    (the model must learn which actions belong to which observations).
+    """
+
+    def __init__(self, cache_path, n_negatives=7, sample_indices=None):
+        data = np.load(cache_path)
+        self.obs_windows = data['obs_windows']      # (N, T, obs_dim)
+        self.expert_actions = data['expert_actions']  # (N, H, 7)
+        self.dp_negs = data['dp_negs']               # (N, K, H, 7)
+        self.K = int(data['K'])
+        self.n_negatives = n_negatives
+
+        # Subsample for train/val split.
+        if sample_indices is not None:
+            self.obs_windows = self.obs_windows[sample_indices]
+            self.expert_actions = self.expert_actions[sample_indices]
+            self.dp_negs = self.dp_negs[sample_indices]
+
+        self.n_samples = len(self.obs_windows)
+        self.obs_dim = self.obs_windows.shape[-1]
+        self.action_dim = self.dp_negs.shape[-1]
+        self.action_chunk = self.dp_negs.shape[2]
+
+        print(f"ContrastiveDPNegDataset: {self.n_samples} samples, K={self.K}, "
+              f"M={self.n_negatives}, obs_dim={self.obs_dim}, "
+              f"action_dim={self.action_dim}, action_chunk={self.action_chunk}")
+
+    def __len__(self):
+        return self.n_samples
+
+    def __getitem__(self, idx):
+        obs = self.obs_windows[idx]              # (T, obs_dim)
+
+        # Positive: random DP proposal from THIS observation.
+        pos_k = np.random.randint(self.K)
+        positive = self.dp_negs[idx, pos_k]      # (H, action_dim)
+
+        # Negatives: DP proposals from OTHER observations.
+        other_idx = np.random.choice(
+            self.n_samples - 1, self.n_negatives, replace=False
+        )
+        other_idx[other_idx >= idx] += 1         # skip self
+        neg_ks = np.random.randint(0, self.K, size=self.n_negatives)
+        negatives = self.dp_negs[other_idx, neg_ks]  # (M, H, action_dim)
+
+        # Stack: [positive, neg1, neg2, ...]
+        all_actions = np.concatenate(
+            [positive[np.newaxis], negatives], axis=0
+        )  # (1+M, H, action_dim)
+
+        return {
+            'obs': torch.from_numpy(obs.copy()),
+            'actions': torch.from_numpy(all_actions.copy()),
+        }
+
+
+class ContrastiveMixtureDataset(Dataset):
+    """
+    Mixture dataset: synthetic hard negatives + DP cross-obs negatives.
+
+    Combines the strengths of both:
+    - Synthetic negatives capture "impossible moves" (permuted, mirrored, rotated, noisy)
+    - DP cross-obs negatives provide realistic but wrong-context actions
+
+    Uses expert data from HDF5 as the base (obs + positive action),
+    supplements with DP proposals from a pre-built NPZ cache.
+    """
+
+    def __init__(
+        self,
+        data_path,
+        dp_neg_cache_path,
+        obs_keys,
+        obs_window=2,
+        action_chunk=10,
+        n_negatives=15,
+        dp_neg_ratio=0.3,
+        hard_negative_ratio=0.5,
+        noise_std=0.1,
+        episode_filter=None,
+    ):
+        self.obs_window = obs_window
+        self.action_chunk = action_chunk
+        self.n_negatives = n_negatives
+        self.dp_neg_ratio = dp_neg_ratio
+        self.hard_negative_ratio = hard_negative_ratio
+        self.noise_std = noise_std
+        self.episode_filter = episode_filter
+        self.obs_keys = obs_keys
+
+        self.data_path = Path(data_path)
+        self._load_expert_data()
+        self._load_dp_neg_cache(dp_neg_cache_path)
+        self._create_index()
+
+        # Compute negative counts
+        self.n_dp_neg = int(self.n_negatives * self.dp_neg_ratio)
+        n_synthetic = self.n_negatives - self.n_dp_neg
+        self.n_hard = int(n_synthetic * self.hard_negative_ratio)
+        self.n_random = n_synthetic - self.n_hard
+
+        print(f"ContrastiveMixtureDataset: {len(self.valid_indices)} samples")
+        print(f"  Negatives per sample: {self.n_negatives} "
+              f"({self.n_dp_neg} DP + {self.n_hard} hard + {self.n_random} random)")
+
+    def _load_expert_data(self):
+        import h5py
+
+        all_obs = []
+        all_actions = []
+        episode_ends = []
+
+        with h5py.File(str(self.data_path), 'r') as f:
+            demos = f['data']
+            demo_keys = sorted((k for k in demos.keys() if k.startswith('demo_')),
+                               key=lambda k: int(k.split('_')[1]))
+
+            first_demo = demos[demo_keys[0]]
+            total_obs_dim = 0
+            for key in self.obs_keys:
+                if key not in first_demo['obs']:
+                    available = list(first_demo['obs'].keys())
+                    raise ValueError(f"obs key '{key}' not in HDF5. Available: {available}")
+                total_obs_dim += first_demo['obs'][key].shape[-1]
+
+            cumulative = 0
+            for demo_key in demo_keys:
+                demo = demos[demo_key]
+                obs_parts = [demo['obs'][k][:] for k in self.obs_keys]
+                obs = np.concatenate(obs_parts, axis=-1).astype(np.float32)
+                actions = demo['actions'][:].astype(np.float32)
+                all_obs.append(obs)
+                all_actions.append(actions)
+                cumulative += len(actions)
+                episode_ends.append(cumulative)
+
+        self.obs = np.concatenate(all_obs, axis=0)
+        self.actions = np.concatenate(all_actions, axis=0)
+        self.episode_ends = np.array(episode_ends)
+        self.obs_dim = self.obs.shape[-1]
+        self.action_dim = self.actions.shape[-1]
+        self.episode_starts = np.concatenate([[0], self.episode_ends[:-1]])
+        self.num_episodes = len(self.episode_ends)
+
+        print(f"Expert data: {self.num_episodes} demos, {len(self.obs)} frames, "
+              f"obs_dim={self.obs_dim}, action_dim={self.action_dim}")
+
+    def _load_dp_neg_cache(self, cache_path):
+        data = np.load(cache_path)
+        self.dp_obs = data['obs_windows']       # (N_dp, T, obs_dim)
+        self.dp_actions = data['dp_negs']        # (N_dp, K, H, action_dim)
+        self.dp_K = int(data['K'])
+        self.dp_N = len(self.dp_obs)
+        print(f"DP neg cache: {self.dp_N} samples, K={self.dp_K}")
+
+    def _create_index(self):
+        self.valid_indices = []
+        min_len = self.obs_window + self.action_chunk
+
+        for ep_idx in range(self.num_episodes):
+            if self.episode_filter is not None and ep_idx not in self.episode_filter:
+                continue
+
+            start = self.episode_starts[ep_idx]
+            end = self.episode_ends[ep_idx]
+            ep_len = end - start
+
+            if ep_len < min_len:
+                continue
+
+            for t in range(self.obs_window - 1, ep_len - self.action_chunk):
+                global_t = start + t
+                self.valid_indices.append((ep_idx, global_t))
+
+    def _get_obs_window(self, global_t):
+        start_t = global_t - self.obs_window + 1
+        return self.obs[start_t:global_t + 1].copy()
+
+    def _get_action_chunk(self, global_t):
+        return self.actions[global_t:global_t + self.action_chunk].copy()
+
+    def _get_random_action_chunk(self, exclude_ep_idx, exclude_t):
+        while True:
+            idx = np.random.randint(len(self.valid_indices))
+            ep_idx, global_t = self.valid_indices[idx]
+            if ep_idx != exclude_ep_idx or abs(global_t - exclude_t) > self.action_chunk * 2:
+                return self._get_action_chunk(global_t)
+
+    def _get_hard_negative(self, positive_action, neg_type):
+        if neg_type == 0:
+            return positive_action + np.random.randn(*positive_action.shape).astype(np.float32) * self.noise_std
+        elif neg_type == 1:
+            perm = np.random.permutation(self.action_chunk)
+            return positive_action[perm]
+        elif neg_type == 2:
+            mirrored = positive_action.copy()
+            dim_to_negate = np.random.randint(positive_action.shape[1])
+            mirrored[:, dim_to_negate] = -mirrored[:, dim_to_negate]
+            return mirrored
+        elif neg_type == 3:
+            d = positive_action.shape[1]
+            q, _ = np.linalg.qr(np.random.randn(d, d).astype(np.float32))
+            return (positive_action @ q.T).astype(np.float32)
+        else:
+            swapped = positive_action.copy()
+            d = positive_action.shape[1]
+            perm = np.random.permutation(d)
+            return swapped[:, perm].astype(np.float32)
+
+    def _get_dp_negatives(self, n):
+        """Get n DP cross-obs negatives (random obs, random K)."""
+        indices = np.random.randint(0, self.dp_N, size=n)
+        ks = np.random.randint(0, self.dp_K, size=n)
+        negs = self.dp_actions[indices, ks]  # (n, H, action_dim)
+
+        # Truncate or pad action chunk to match expert action_chunk
+        dp_chunk = negs.shape[1]
+        if dp_chunk > self.action_chunk:
+            negs = negs[:, :self.action_chunk]
+        elif dp_chunk < self.action_chunk:
+            pad = np.zeros((n, self.action_chunk - dp_chunk, negs.shape[2]), dtype=np.float32)
+            negs = np.concatenate([negs, pad], axis=1)
+
+        # Truncate or pad action_dim to match expert action_dim
+        dp_adim = negs.shape[2]
+        if dp_adim > self.action_dim:
+            negs = negs[:, :, :self.action_dim]
+        elif dp_adim < self.action_dim:
+            pad = np.zeros((n, self.action_chunk, self.action_dim - dp_adim), dtype=np.float32)
+            negs = np.concatenate([negs, pad], axis=2)
+
+        return negs
+
+    def __len__(self):
+        return len(self.valid_indices)
+
+    def __getitem__(self, idx):
+        ep_idx, global_t = self.valid_indices[idx]
+
+        obs = self._get_obs_window(global_t)
+        positive_action = self._get_action_chunk(global_t)
+
+        negatives = []
+
+        # DP cross-obs negatives
+        if self.n_dp_neg > 0:
+            dp_negs = self._get_dp_negatives(self.n_dp_neg)
+            for i in range(self.n_dp_neg):
+                negatives.append(dp_negs[i])
+
+        # Synthetic hard negatives
+        for i in range(self.n_hard):
+            neg_type = i % 5
+            negatives.append(self._get_hard_negative(positive_action, neg_type))
+
+        # Random expert negatives
+        for _ in range(self.n_random):
+            negatives.append(self._get_random_action_chunk(ep_idx, global_t))
+
+        all_actions = np.stack([positive_action] + negatives, axis=0)
+
+        return {
+            'obs': torch.from_numpy(obs),
+            'actions': torch.from_numpy(all_actions),
+        }
+
+
 def create_contrastive_dataloaders(data_path, batch_size=32, train_split=0.9, obs_type='image',
-                                   data_format='zarr', **kwargs):
+                                   data_format='zarr', dp_neg_cache=None,
+                                   dp_neg_mixture=False, **kwargs):
     """Create train and validation dataloaders for contrastive TAP.
 
     Args:
@@ -841,9 +1188,72 @@ def create_contrastive_dataloaders(data_path, batch_size=32, train_split=0.9, ob
         train_split: Fraction of episodes for training
         obs_type: 'image' for image observations, 'state' for state vectors
         data_format: 'zarr' or 'hdf5'
+        dp_neg_cache: Path to NPZ cache with DP-proposal negatives (overrides other paths)
+        dp_neg_mixture: If True and dp_neg_cache is set, use mixture mode
+                       (expert positives + synthetic + DP negatives) instead of DP-only mode
         **kwargs: Additional arguments for dataset (obs_keys required for hdf5+state)
     """
     from torch.utils.data import DataLoader
+
+    # ── Mixture mode: expert data + synthetic + DP negatives ───────────
+    if dp_neg_cache is not None and dp_neg_mixture:
+        obs_keys = kwargs.pop('obs_keys', None)
+        if obs_keys is None:
+            raise ValueError("obs_keys is required for mixture mode")
+
+        dp_neg_ratio = kwargs.pop('dp_neg_ratio', 0.3)
+        mix_kwargs = {k: v for k, v in kwargs.items()
+                      if k in ('obs_window', 'action_chunk', 'n_negatives',
+                               'hard_negative_ratio', 'noise_std')}
+        mix_kwargs['dp_neg_ratio'] = dp_neg_ratio
+
+        # Episode-based train/val split
+        import h5py
+        with h5py.File(str(data_path), 'r') as f:
+            demo_keys = sorted((k for k in f['data'].keys() if k.startswith('demo_')),
+                               key=lambda k: int(k.split('_')[1]))
+            num_episodes = len(demo_keys)
+
+        episode_indices = np.arange(num_episodes)
+        np.random.shuffle(episode_indices)
+        train_ep_count = int(num_episodes * train_split)
+        train_episodes = set(episode_indices[:train_ep_count].tolist())
+        val_episodes = set(episode_indices[train_ep_count:].tolist())
+
+        print(f"Mixture mode: {len(train_episodes)} train eps, {len(val_episodes)} val eps, "
+              f"dp_neg_ratio={dp_neg_ratio}")
+
+        train_dataset = ContrastiveMixtureDataset(
+            data_path, dp_neg_cache, obs_keys=obs_keys,
+            episode_filter=train_episodes, **mix_kwargs)
+        val_dataset = ContrastiveMixtureDataset(
+            data_path, dp_neg_cache, obs_keys=obs_keys,
+            episode_filter=val_episodes, **mix_kwargs)
+
+        train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=0)
+        val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=0)
+        return train_loader, val_loader
+
+    # ── DP-proposal negative cache path (pure DP-neg mode) ─────────────
+    if dp_neg_cache is not None:
+        n_negatives = kwargs.get('n_negatives', 7)
+        data = np.load(dp_neg_cache)
+        N = len(data['obs_windows'])
+        indices = np.arange(N)
+        np.random.shuffle(indices)
+
+        train_count = int(N * train_split)
+        train_idx = indices[:train_count]
+        val_idx = indices[train_count:]
+
+        print(f"DP-neg cache: {N} samples -> {len(train_idx)} train, {len(val_idx)} val")
+
+        train_dataset = ContrastiveDPNegDataset(dp_neg_cache, n_negatives=n_negatives, sample_indices=train_idx)
+        val_dataset = ContrastiveDPNegDataset(dp_neg_cache, n_negatives=n_negatives, sample_indices=val_idx)
+
+        train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=0)
+        val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=0)
+        return train_loader, val_loader
 
     if data_format == 'hdf5' and obs_type == 'state':
         # HDF5 lowdim path — count demos from HDF5 structure
@@ -868,10 +1278,15 @@ def create_contrastive_dataloaders(data_path, batch_size=32, train_split=0.9, ob
         if obs_keys is None:
             raise ValueError("obs_keys is required for HDF5 lowdim datasets")
 
+        # Filter out kwargs not supported by HDF5 dataset
+        hdf5_kwargs = {k: v for k, v in kwargs.items()
+                       if k in ('obs_window', 'action_chunk', 'n_negatives',
+                                'hard_negative_ratio', 'noise_std')}
+
         train_dataset = ContrastiveHDF5StateTAPDataset(
-            data_path, obs_keys=obs_keys, episode_filter=train_episodes, **kwargs)
+            data_path, obs_keys=obs_keys, episode_filter=train_episodes, **hdf5_kwargs)
         val_dataset = ContrastiveHDF5StateTAPDataset(
-            data_path, obs_keys=obs_keys, episode_filter=val_episodes, **kwargs)
+            data_path, obs_keys=obs_keys, episode_filter=val_episodes, **hdf5_kwargs)
     else:
         # Original zarr path
         root = zarr.open_group(str(data_path), mode='r')
@@ -929,4 +1344,5 @@ def build_contrastive_tap_model(config=None):
         obs_type=config.get("obs_type", "image"),
         obs_dim=config.get("obs_dim"),
         use_deltas=config.get("use_deltas", False),
+        learnable_temperature=config.get("learnable_temperature", False),
     )

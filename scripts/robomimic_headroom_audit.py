@@ -26,9 +26,10 @@ import time
 from collections import defaultdict
 from contextlib import contextmanager, nullcontext
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import dill
+import h5py
 import hydra
 import numpy as np
 import torch
@@ -128,12 +129,68 @@ def infer_image_render_key(shape_meta: Dict[str, Any], env_runner_cfg: Any) -> s
     raise ValueError("Could not infer image render key from shape_meta.")
 
 
-def make_robomimic_env_factory(cfg: Any, dataset_path: Path):
+def _patch_abs_action_controller(env_wrapper, kp: float = 500.0):
+    """Set robosuite 1.5.2 OSC controller to absolute input mode (world frame).
+
+    robosuite 1.5.2 uses CompositeController with JSON config files
+    (default_panda.json) that default to ``"input_type": "delta"`` and
+    ``"input_ref_frame": "base"``.  The dict-based ``controller_configs``
+    in ``env_meta`` is ignored.
+
+    Patches applied:
+    1. ``input_type = "absolute"`` — interpret actions as target poses, not deltas.
+    2. ``input_ref_frame = "world"`` — interpret positions in world frame.
+       Without this, robosuite 1.5.2 transforms through the robot base origin:
+       ``desired = origin_pos + R(origin_ori) @ goal_pos``, which corrupts
+       DP's world-frame absolute positions.
+    3. Boost ``kp`` — robosuite 1.5.2's OSC controller converges more slowly
+       than the old fork (cheng-chi/robosuite) used to train these checkpoints.
+    """
+    try:
+        robosuite_env = env_wrapper.env.env
+        for robot in robosuite_env.robots:
+            for _part_name, controller in robot.part_controllers.items():
+                if hasattr(controller, "input_type"):
+                    controller.input_type = "absolute"
+                if hasattr(controller, "input_ref_frame"):
+                    controller.input_ref_frame = "world"
+                if hasattr(controller, "kp"):
+                    controller.kp = np.full(len(controller.kp), kp)
+                    controller.kd = 2.0 * np.sqrt(controller.kp)
+    except (AttributeError, KeyError):
+        pass
+
+
+def _wrap_reset_for_abs_action(wrapped, kp: float = 500.0):
+    """Monkey-patch ``reset()`` so the absolute-mode patch survives resets.
+
+    robosuite recreates controllers on every ``reset()`` call
+    (``_load_controller()``), reverting our patch. This ensures the
+    controller is re-patched every time.
+    """
+    original_reset = wrapped.reset
+
+    def patched_reset(*a, **kw):
+        result = original_reset(*a, **kw)
+        _patch_abs_action_controller(wrapped, kp=kp)
+        return result
+
+    wrapped.reset = patched_reset
+
+
+def make_robomimic_env_factory(
+    cfg: Any, dataset_path: Path, abs_action_override: bool | None = None,
+    kp: float = 500.0,
+):
     """Create a callable that builds fresh wrapped Robomimic envs."""
     task_cfg = cfg.task
     env_runner_cfg = task_cfg.env_runner
     mode = infer_task_mode(task_cfg)
     env_meta = FileUtils.get_env_metadata_from_dataset(str(dataset_path))
+
+    abs_action = bool(cfg_get(task_cfg, "abs_action", False))
+    if abs_action_override is not None:
+        abs_action = bool(abs_action_override)
 
     if mode == "lowdim":
         obs_keys = list(task_cfg.obs_keys)
@@ -147,6 +204,8 @@ def make_robomimic_env_factory(cfg: Any, dataset_path: Path):
                 use_image_obs=False,
             )
             wrapped = RobomimicLowdimWrapper(env=env, obs_keys=obs_keys)
+            if abs_action:
+                _wrap_reset_for_abs_action(wrapped, kp=kp)
             wrapped.reset()  # warm up internal state caches before reset_to
             return wrapped
 
@@ -168,7 +227,7 @@ def make_robomimic_env_factory(cfg: Any, dataset_path: Path):
         env = EnvUtils.create_env_from_metadata(
             env_meta=env_meta,
             render=False,
-            render_offscreen=False,
+            render_offscreen=True,
             use_image_obs=True,
         )
         # Keeps memory bounded in long audits.
@@ -179,6 +238,8 @@ def make_robomimic_env_factory(cfg: Any, dataset_path: Path):
             shape_meta=shape_meta,
             render_obs_key=render_obs_key,
         )
+        if abs_action:
+            _wrap_reset_for_abs_action(wrapped, kp=kp)
         wrapped.reset()  # required before repeated reset_to calls
         return wrapped
 
@@ -194,8 +255,13 @@ def _ensure_float_obs(arr: np.ndarray) -> np.ndarray:
     out = np.asarray(arr)
     if out.dtype == np.uint8:
         out = out.astype(np.float32) / 255.0
-    elif out.dtype != np.float32:
+    else:
         out = out.astype(np.float32)
+        # If wrapper gives float images in 0..255, normalize.
+        if out.ndim == 3:
+            mx = float(out.max()) if out.size else 0.0
+            if mx > 1.5 and mx <= 255.0:
+                out = out / 255.0
 
     # Robustness: convert HWC image to CHW if needed.
     if out.ndim == 3 and out.shape[-1] in (1, 3) and out.shape[0] not in (1, 3):
@@ -203,10 +269,174 @@ def _ensure_float_obs(arr: np.ndarray) -> np.ndarray:
     return out
 
 
-def obs_to_dict(obs: Any) -> Dict[str, np.ndarray]:
+# ── Task-aware observation layout ─────────────────────────────────────
+#
+# Non-object key dims are consistent across Lift/Can/etc.
+_ROBOT_KEY_DIMS = {
+    "robot0_eef_pos": 3, "robot0_eef_quat": 4, "robot0_gripper_qpos": 2,
+}
+
+# Task-specific object observation layout.
+#
+# robosuite 1.5.2 differs from the old cheng-chi/robosuite fork in two ways:
+#
+#   1) **Sign flip** (Lift): gripper_to_cube_pos was eef-cube in old fork,
+#      now cube-eef in 1.5.2.  Fix: negate the relative-position indices.
+#
+#   2) **Field reorder** (Can): old fork produced
+#        [abs_pos(3), abs_quat(4), rel_pos(3), rel_quat(4)]
+#      but 1.5.2 produces
+#        [rel_pos(3), rel_quat(4), abs_pos(3), abs_quat(4)]
+#      Fix: swap the two halves back to old-fork order.
+#
+# Fields:
+#   object_dim       – total dimensionality of the "object" obs key
+#   sign_flip_slice  – indices to negate (sign flip), or None
+#   reorder          – permutation list mapping 1.5.2 → old-fork order, or None
+#
+# Lift (10D): [cube_pos(3), cube_quat(4), gripper_to_cube_pos(3)]
+#   → sign-flip at [7:10]
+# Can  (14D): 1.5.2 gives [rel_pos(3), rel_quat(4), abs_pos(3), abs_quat(4)]
+#   → old fork was  [abs_pos(3), abs_quat(4), rel_pos(3), rel_quat(4)]
+#   → reorder: take indices [7..13, 0..6]
+_TASK_OBJECT_INFO: Dict[str, Dict[str, Any]] = {
+    "lift": {
+        "object_dim": 10,
+        "sign_flip_slice": slice(7, 10),
+        "reorder": None,
+    },
+    "can": {
+        "object_dim": 14,
+        "sign_flip_slice": None,
+        "reorder": list(range(7, 14)) + list(range(0, 7)),  # swap halves
+    },
+    "square": {
+        "object_dim": 14,
+        "sign_flip_slice": None,
+        "reorder": list(range(7, 14)) + list(range(0, 7)),  # same layout as Can
+    },
+}
+
+
+def _get_object_dim(task_name: str) -> int:
+    """Return object obs dimensionality for *task_name*."""
+    info = _TASK_OBJECT_INFO.get(task_name.lower())
+    if info is None:
+        raise ValueError(
+            f"Unknown task '{task_name}' — add it to _TASK_OBJECT_INFO. "
+            f"Known tasks: {list(_TASK_OBJECT_INFO)}"
+        )
+    return info["object_dim"]
+
+
+def _obs_key_dims(task_name: str) -> Dict[str, int]:
+    """Build full obs-key → dim mapping for *task_name*."""
+    return {**_ROBOT_KEY_DIMS, "object": _get_object_dim(task_name)}
+
+
+def _fix_object_obs_compat(
+    obs_flat: np.ndarray, obs_keys: List[str], task_name: str,
+) -> np.ndarray:
+    """Fix ``object`` obs for robosuite 1.5.2 compatibility.
+
+    Applies task-specific transforms (sign flip and/or field reorder) so that
+    the observation matches the layout the DP checkpoint was trained on.
+    See ``_TASK_OBJECT_INFO`` for per-task details.
+    """
+    info = _TASK_OBJECT_INFO.get(task_name.lower())
+    if info is None:
+        return obs_flat  # unknown task — don't touch
+
+    dims = _obs_key_dims(task_name)
+    idx = 0
+    for key in obs_keys:
+        if key == "object":
+            obs_flat = obs_flat.copy()
+            obj_dim = info["object_dim"]
+            # Reorder fields (e.g. Can: swap absolute/relative halves).
+            reorder = info.get("reorder")
+            if reorder is not None:
+                obs_flat[idx : idx + obj_dim] = obs_flat[idx : idx + obj_dim][reorder]
+            # Sign-flip relative position (e.g. Lift: negate gripper_to_cube_pos).
+            sf = info.get("sign_flip_slice")
+            if sf is not None:
+                obs_flat[idx + sf.start : idx + sf.stop] *= -1.0
+            break
+        idx += dims.get(key, 0)
+    return obs_flat
+
+
+# ── Observation perturbation (simulated occlusion / sensor failure) ───
+
+PERTURB_TYPES = ("none", "zero_object", "noise_object", "freeze_object", "intermittent_dropout")
+
+
+def _find_object_slice(
+    obs_keys: List[str], task_name: str,
+) -> tuple[int, int] | None:
+    """Return (start, end) indices of 'object' block in the flat obs vector."""
+    dims = _obs_key_dims(task_name)
+    idx = 0
+    for key in obs_keys:
+        if key == "object":
+            return idx, idx + dims["object"]
+        idx += dims.get(key, 0)
+    return None
+
+
+def _apply_obs_perturbation(
+    obs_flat: np.ndarray,
+    obs_keys: List[str],
+    perturb_type: str,
+    task_name: str,
+    perturb_rng: np.random.RandomState | None = None,
+    noise_std: float = 0.01,
+    frozen_object: np.ndarray | None = None,
+    dropout_p: float = 0.3,
+) -> np.ndarray:
+    """Apply observation perturbation to simulate sensor failures / occlusion.
+
+    Perturbation types:
+      - zero_object:   zero all object dims (total occlusion — can't see object)
+      - noise_object:  add Gaussian noise to object dims (noisy perception)
+      - freeze_object: replace object dims with captured values (tracker lost / frozen)
+    """
+    if perturb_type == "none":
+        return obs_flat
+
+    obj_slice = _find_object_slice(obs_keys, task_name)
+    if obj_slice is None:
+        return obs_flat
+
+    s, e = obj_slice
+    obs_flat = obs_flat.copy()
+
+    if perturb_type == "zero_object":
+        obs_flat[s:e] = 0.0
+    elif perturb_type == "noise_object":
+        if perturb_rng is None:
+            perturb_rng = np.random.RandomState()
+        obs_flat[s:e] += perturb_rng.randn(e - s) * noise_std
+    elif perturb_type == "freeze_object":
+        if frozen_object is not None:
+            obs_flat[s:e] = frozen_object
+    elif perturb_type == "intermittent_dropout":
+        if perturb_rng is not None and perturb_rng.rand() < dropout_p:
+            obs_flat[s:e] = 0.0
+    return obs_flat
+
+
+def obs_to_dict(
+    obs: Any,
+    obs_keys: List[str] | None = None,
+    task_name: str | None = None,
+) -> Dict[str, np.ndarray]:
     if isinstance(obs, dict):
         return {k: _ensure_float_obs(v) for k, v in obs.items()}
-    return {"obs": _ensure_float_obs(obs)}
+    out = _ensure_float_obs(obs)
+    if obs_keys is not None and task_name is not None and out.ndim == 1:
+        out = _fix_object_obs_compat(out, obs_keys, task_name)
+    return {"obs": out}
 
 
 def stack_history(hist: List[np.ndarray], T: int) -> np.ndarray:
@@ -238,13 +468,25 @@ def get_env_state(env_wrapper) -> np.ndarray:
     return np.array(state, copy=True)
 
 
-def set_env_state(env_wrapper, state: np.ndarray) -> Dict[str, np.ndarray]:
+def set_env_state(
+    env_wrapper, state: np.ndarray,
+    obs_keys: List[str] | None = None,
+    task_name: str | None = None,
+) -> Dict[str, np.ndarray]:
     raw_obs = env_wrapper.env.reset_to({"states": np.array(state, copy=True)})
+    # reset_to doesn't call _reset_internal, so robosuite's timestep/done
+    # accumulate across reuses and eventually crash with "terminated episode".
+    try:
+        robosuite_env = env_wrapper.env.env
+        robosuite_env.timestep = 0
+        robosuite_env.done = False
+    except AttributeError:
+        pass
     try:
         obs = env_wrapper.get_observation(raw_obs)
     except TypeError:
         obs = env_wrapper.get_observation()
-    return obs_to_dict(obs)
+    return obs_to_dict(obs, obs_keys=obs_keys, task_name=task_name)
 
 
 def mean_pairwise_l2(candidates: np.ndarray) -> float:
@@ -336,8 +578,8 @@ def trim_latency(action_chunk: np.ndarray, n_latency_steps: int) -> np.ndarray:
 
 
 def maybe_autocast(device: torch.device):
-    if device.type == "cuda":
-        return torch.amp.autocast("cuda", dtype=torch.float16)
+    # DP's runner uses fp32 for inference. fp16 autocast can degrade diffusion
+    # sampling quality (DDPM scheduler uses small alpha values). Use fp32.
     return nullcontext()
 
 
@@ -367,6 +609,14 @@ def step_chunk(
     max_env_steps: int,
     abs_action: bool,
     rotation_transformer: RotationTransformer | None,
+    obs_keys: List[str] | None = None,
+    task_name: str | None = None,
+    perturb_type: str = "none",
+    perturb_start_step: int = 0,
+    perturb_rng: np.random.RandomState | None = None,
+    perturb_noise_std: float = 0.01,
+    frozen_object: np.ndarray | None = None,
+    dropout_p: float = 0.3,
 ) -> Tuple[float, bool, bool, int]:
     if abs_action:
         if rotation_transformer is None:
@@ -379,81 +629,32 @@ def step_chunk(
 
     for act in action_chunk:
         obs, reward, step_done, info = env.step(act)
-        obs_dict = obs_to_dict(obs)
+        obs_dict = obs_to_dict(obs, obs_keys=obs_keys, task_name=task_name)
+        # Apply perturbation (simulated occlusion) to obs before policy sees it.
+        if perturb_type != "none" and obs_keys is not None and task_name is not None and env_steps >= perturb_start_step:
+            if "obs" in obs_dict and obs_dict["obs"].ndim == 1:
+                # Capture frozen_object at the moment perturbation starts.
+                if perturb_type == "freeze_object" and frozen_object is None:
+                    obj_slice = _find_object_slice(obs_keys, task_name)
+                    if obj_slice is not None:
+                        s, e = obj_slice
+                        frozen_object = obs_dict["obs"][s:e].copy()
+                obs_dict["obs"] = _apply_obs_perturbation(
+                    obs_dict["obs"], obs_keys, perturb_type, task_name,
+                    perturb_rng, perturb_noise_std, frozen_object,
+                    dropout_p=dropout_p,
+                )
         for key, val in obs_dict.items():
             obs_history[key].append(val)
 
         total_return += float(reward)
-        success = success or extract_success(info)
+        success = success or extract_success(info) or float(reward) >= 1.0
         env_steps += 1
         if step_done or env_steps >= max_env_steps:
             done = True
             break
 
     return total_return, done, success, env_steps
-
-
-def rollout_candidate_to_end(
-    branch_env,
-    dp_policy,
-    saved_state: np.ndarray,
-    saved_obs_history: Dict[str, List[np.ndarray]],
-    candidate_chunk: np.ndarray,
-    env_steps_at_decision: int,
-    max_env_steps: int,
-    n_obs_steps: int,
-    n_latency_steps: int,
-    abs_action: bool,
-    rotation_transformer: RotationTransformer | None,
-    device: torch.device,
-    continuation_seed_base: int,
-) -> Tuple[float, bool]:
-    _ = set_env_state(branch_env, saved_state)
-    obs_history = clone_obs_history(saved_obs_history)
-
-    env_steps = int(env_steps_at_decision)
-    total_return = 0.0
-    success = False
-    done = False
-
-    # First chunk: the candidate being evaluated.
-    r, done, succ, env_steps = step_chunk(
-        branch_env,
-        obs_history,
-        candidate_chunk,
-        env_steps,
-        max_env_steps,
-        abs_action,
-        rotation_transformer,
-    )
-    total_return += r
-    success = success or succ
-
-    # Continue with K=1 policy until episode end for true return-to-go.
-    continuation_idx = 0
-    while not done and env_steps < max_env_steps:
-        obs_tensor = build_obs_tensor(obs_history, n_obs_steps, device=device)
-        set_torch_seed(int(continuation_seed_base + continuation_idx))
-        with torch.no_grad():
-            with maybe_autocast(device):
-                action_dict = dp_policy.predict_action(obs_tensor)
-        next_chunk = action_dict["action"][0].detach().cpu().numpy()
-        next_chunk = trim_latency(next_chunk, n_latency_steps)
-
-        r, done, succ, env_steps = step_chunk(
-            branch_env,
-            obs_history,
-            next_chunk,
-            env_steps,
-            max_env_steps,
-            abs_action,
-            rotation_transformer,
-        )
-        total_return += r
-        success = success or succ
-        continuation_idx += 1
-
-    return float(total_return), bool(success)
 
 
 def evaluate_candidates(
@@ -470,31 +671,97 @@ def evaluate_candidates(
     rotation_transformer: RotationTransformer | None,
     device: torch.device,
     continuation_seed_base: int,
+    branch_horizon: int | None = None,
+    obs_keys: List[str] | None = None,
+    task_name: str | None = None,
 ) -> Tuple[np.ndarray, np.ndarray]:
+    """Evaluate K candidate branches using batched lockstep rollout.
+
+    Instead of K separate threads each doing batch_size=1 policy inference,
+    this steps all K branches in lockstep and does a single batched
+    predict_action(batch_size=K) per continuation step.  This gives ~K×
+    speedup on GPU (batched inference) and avoids thread overhead entirely.
+
+    If *branch_horizon* is set, each branch rolls out at most that many
+    env steps instead of running to episode end.  This makes each decision
+    O(K * branch_horizon) instead of O(K * remaining_horizon).
+    """
     K = int(candidates.shape[0])
+    branch_max_steps = max_env_steps
+    if branch_horizon is not None:
+        branch_max_steps = min(max_env_steps, env_steps_at_decision + branch_horizon)
+
     returns = np.zeros((K,), dtype=np.float64)
     successes = np.zeros((K,), dtype=np.bool_)
+    active = np.ones((K,), dtype=np.bool_)
+    env_steps_arr = np.full((K,), env_steps_at_decision, dtype=np.int64)
 
-    # Preserve policy RNG so branch probing does not perturb the on-policy rollout stream.
+    # Per-branch obs histories
+    branch_obs_histories: List[Dict[str, List[np.ndarray]]] = []
+
+    # Restore state and execute candidate chunk in each branch.
+    for k in range(K):
+        _ = set_env_state(branch_envs[k], saved_state, obs_keys=obs_keys, task_name=task_name)
+        obs_hist_k = clone_obs_history(saved_obs_history)
+        r, done, succ, es = step_chunk(
+            branch_envs[k],
+            obs_hist_k,
+            candidates[k],
+            int(env_steps_arr[k]),
+            branch_max_steps,
+            abs_action,
+            rotation_transformer,
+            obs_keys=obs_keys,
+            task_name=task_name,
+        )
+        returns[k] += r
+        successes[k] = successes[k] or succ
+        env_steps_arr[k] = es
+        if done or es >= branch_max_steps:
+            active[k] = False
+        branch_obs_histories.append(obs_hist_k)
+
+    # Lockstep continuation: batch all active branches into one GPU call.
     with preserve_torch_rng_state():
-        for k in range(K):
-            ret, succ = rollout_candidate_to_end(
-                branch_env=branch_envs[k],
-                dp_policy=dp_policy,
-                saved_state=saved_state,
-                saved_obs_history=saved_obs_history,
-                candidate_chunk=candidates[k],
-                env_steps_at_decision=env_steps_at_decision,
-                max_env_steps=max_env_steps,
-                n_obs_steps=n_obs_steps,
-                n_latency_steps=n_latency_steps,
-                abs_action=abs_action,
-                rotation_transformer=rotation_transformer,
-                device=device,
-                continuation_seed_base=continuation_seed_base,
-            )
-            returns[k] = ret
-            successes[k] = succ
+        continuation_idx = 0
+        while active.any():
+            active_indices = np.where(active)[0]
+
+            # Build batched obs tensor for all active branches.
+            obs_batch: Dict[str, List[torch.Tensor]] = {}
+            for k_idx in active_indices:
+                obs_t = build_obs_tensor(branch_obs_histories[k_idx], n_obs_steps, device=device)
+                for key, val in obs_t.items():
+                    obs_batch.setdefault(key, []).append(val)
+            obs_batched = {key: torch.cat(tensors, dim=0) for key, tensors in obs_batch.items()}
+
+            set_torch_seed(int(continuation_seed_base + continuation_idx))
+            with maybe_autocast(device):
+                action_dict = dp_policy.predict_action(obs_batched)
+            all_chunks = action_dict["action"].detach().cpu().numpy()  # (n_active, H, A)
+            all_chunks = trim_latency(all_chunks, n_latency_steps)
+
+            # Step each active branch with its action chunk.
+            for i, k_idx in enumerate(active_indices):
+                chunk_k = all_chunks[i]
+                r, done, succ, es = step_chunk(
+                    branch_envs[k_idx],
+                    branch_obs_histories[k_idx],
+                    chunk_k,
+                    int(env_steps_arr[k_idx]),
+                    branch_max_steps,
+                    abs_action,
+                    rotation_transformer,
+                    obs_keys=obs_keys,
+                    task_name=task_name,
+                )
+                returns[k_idx] += r
+                successes[k_idx] = successes[k_idx] or succ
+                env_steps_arr[k_idx] = es
+                if done or es >= branch_max_steps:
+                    active[k_idx] = False
+
+            continuation_idx += 1
 
     return returns, successes
 
@@ -517,12 +784,45 @@ def run_episode(
     rotation_transformer: RotationTransformer | None,
     device: torch.device,
     continuation_seed: int,
+    branch_horizon: int | None = None,
+    init_state_fn=None,
+    obs_keys: List[str] | None = None,
+    task_name: str | None = None,
+    perturb_type: str = "none",
+    perturb_start_step: int = 0,
+    perturb_rng: np.random.RandomState | None = None,
+    perturb_noise_std: float = 0.01,
 ) -> Dict[str, Any]:
     env = env_factory()
     try:
-        env.seed(seed)
+        if hasattr(env, "seed"):
+            env.seed(seed)
+        elif hasattr(env, "set_seed"):
+            env.set_seed(seed)
         obs = env.reset()
-        obs_dict = obs_to_dict(obs)
+        if init_state_fn is not None:
+            state0 = init_state_fn(seed)
+            obs_dict = set_env_state(env, state0, obs_keys=obs_keys, task_name=task_name)
+        else:
+            obs_dict = obs_to_dict(obs, obs_keys=obs_keys, task_name=task_name)
+
+        # For freeze_object: capture at perturb_start_step (deferred to step_chunk
+        # if perturb_start_step > 0).  Only capture here for start_step == 0.
+        frozen_object = None
+        if perturb_type == "freeze_object" and obs_keys is not None and task_name is not None and perturb_start_step == 0:
+            if "obs" in obs_dict and obs_dict["obs"].ndim == 1:
+                obj_slice = _find_object_slice(obs_keys, task_name)
+                if obj_slice is not None:
+                    s, e = obj_slice
+                    frozen_object = obs_dict["obs"][s:e].copy()
+
+        # Apply perturbation to initial obs if perturb_start_step == 0.
+        if perturb_type != "none" and obs_keys is not None and task_name is not None and 0 >= perturb_start_step:
+            if "obs" in obs_dict and obs_dict["obs"].ndim == 1:
+                obs_dict["obs"] = _apply_obs_perturbation(
+                    obs_dict["obs"], obs_keys, perturb_type, task_name,
+                    perturb_rng, perturb_noise_std, frozen_object,
+                )
 
         obs_history = defaultdict(list)
         for key, val in obs_dict.items():
@@ -570,6 +870,9 @@ def run_episode(
                     rotation_transformer=rotation_transformer,
                     device=device,
                     continuation_seed_base=continuation_seed_base,
+                    branch_horizon=branch_horizon,
+                    obs_keys=obs_keys,
+                    task_name=task_name,
                 )
 
                 spread = mean_pairwise_l2(candidates)
@@ -593,6 +896,13 @@ def run_episode(
                     max_env_steps,
                     abs_action,
                     rotation_transformer,
+                    obs_keys=obs_keys,
+                    task_name=task_name,
+                    perturb_type=perturb_type,
+                    perturb_start_step=perturb_start_step,
+                    perturb_rng=perturb_rng,
+                    perturb_noise_std=perturb_noise_std,
+                    frozen_object=frozen_object,
                 )
                 episode_return += r
                 episode_success = episode_success or succ
@@ -630,6 +940,13 @@ def run_episode(
                     max_env_steps,
                     abs_action,
                     rotation_transformer,
+                    obs_keys=obs_keys,
+                    task_name=task_name,
+                    perturb_type=perturb_type,
+                    perturb_start_step=perturb_start_step,
+                    perturb_rng=perturb_rng,
+                    perturb_noise_std=perturb_noise_std,
+                    frozen_object=frozen_object,
                 )
                 episode_return += r
                 episode_success = episode_success or succ
@@ -684,6 +1001,18 @@ def make_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--seed_offset", type=int, default=0)
     parser.add_argument(
+        "--reset_to_dataset_init",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Reset each episode to a demo initial state from the dataset (robomimic-style eval).",
+    )
+    parser.add_argument(
+        "--action_mode",
+        choices=["auto", "abs", "delta"],
+        default="auto",
+        help="Override action mode. 'auto' reads from checkpoint config.",
+    )
+    parser.add_argument(
         "--eval_oracle_policy",
         action=argparse.BooleanOptionalAction,
         default=True,
@@ -708,6 +1037,40 @@ def make_parser() -> argparse.ArgumentParser:
         help="Near-zero success-gain threshold in absolute points (e.g., 0.02 = 2pp).",
     )
     parser.add_argument(
+        "--branch_horizon",
+        type=int,
+        default=None,
+        help="Max env steps per branch rollout (bounded lookahead). "
+             "Default: roll out to episode end. 50-100 is sufficient for fork decisions.",
+    )
+    parser.add_argument(
+        "--kp",
+        type=float,
+        default=500.0,
+        help="OSC controller proportional gain (robosuite 1.5.2 default is 150, "
+             "boosted to compensate for dynamics mismatch with old fork).",
+    )
+    parser.add_argument(
+        "--perturb",
+        choices=PERTURB_TYPES,
+        default="none",
+        help="Observation perturbation type (simulated occlusion). "
+             "zero_object: zero all object dims. noise_object: add Gaussian noise. "
+             "freeze_object: freeze object obs at initial values.",
+    )
+    parser.add_argument(
+        "--perturb_start_step",
+        type=int,
+        default=0,
+        help="Env step at which perturbation begins (0 = from start, >0 = mid-episode occlusion).",
+    )
+    parser.add_argument(
+        "--perturb_noise_std",
+        type=float,
+        default=0.01,
+        help="Noise std for noise_object perturbation.",
+    )
+    parser.add_argument(
         "--continuation_seed",
         type=int,
         default=12345,
@@ -724,17 +1087,88 @@ def make_parser() -> argparse.ArgumentParser:
         type=str,
         default="cuda" if torch.cuda.is_available() else "cpu",
     )
+    parser.add_argument(
+        "--resume",
+        action="store_true",
+        default=False,
+        help="Resume from checkpoint file. Skips already-completed episodes.",
+    )
     return parser
+
+
+# ── Checkpoint helpers ──────────────────────────────────────────────
+
+def _checkpoint_path(output_path: Path) -> Path:
+    """Derive checkpoint path from output path: foo.json -> foo.ckpt.json"""
+    return output_path.with_suffix(".ckpt.json")
+
+
+def save_checkpoint(
+    ckpt_path: Path,
+    phase: str,
+    baseline_episodes: List[Dict],
+    decision_points: List[Dict],
+    oracle_episode_summaries: List[Dict],
+    completed_baseline_seeds: List[int],
+    completed_oracle_seeds: List[int],
+    args_dict: Dict[str, Any],
+):
+    ckpt = {
+        "phase": phase,
+        "completed_baseline_seeds": completed_baseline_seeds,
+        "completed_oracle_seeds": completed_oracle_seeds,
+        "baseline_episodes": baseline_episodes,
+        "decision_points": decision_points,
+        "oracle_episode_summaries": oracle_episode_summaries,
+        "args": args_dict,
+    }
+    tmp = ckpt_path.with_suffix(".tmp")
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(ckpt, f)
+    tmp.replace(ckpt_path)  # atomic on same filesystem
+
+
+def load_checkpoint(ckpt_path: Path, args_dict: Dict[str, Any]) -> Optional[Dict]:
+    if not ckpt_path.is_file():
+        return None
+    with open(ckpt_path, "r", encoding="utf-8") as f:
+        ckpt = json.load(f)
+    # Validate key args match
+    saved = ckpt.get("args", {})
+    for key in ("dp_checkpoint", "K", "decision_interval", "skip_first",
+                "n_episodes", "seed_offset", "continuation_seed",
+                "kp", "action_mode", "reset_to_dataset_init", "branch_horizon",
+                "perturb", "perturb_start_step", "perturb_noise_std"):
+        if str(saved.get(key)) != str(args_dict.get(key)):
+            print(f"WARNING: checkpoint arg '{key}' mismatch: "
+                  f"saved={saved.get(key)} vs current={args_dict.get(key)}")
+            print("Ignoring checkpoint — starting fresh.")
+            return None
+    return ckpt
 
 
 def main():
     args = make_parser().parse_args()
+
+    # Make progress visible when stdout is redirected (background tasks, log files).
+    try:
+        sys.stdout.reconfigure(line_buffering=True)
+        sys.stderr.reconfigure(line_buffering=True)
+    except Exception:
+        pass
+
     if args.K < 1:
         raise ValueError("--K must be >= 1")
     if args.decision_interval < 1:
         raise ValueError("--decision_interval must be >= 1")
     if args.skip_first < 0:
         raise ValueError("--skip_first must be >= 0")
+
+    import os
+    # Cap CPU thread oversubscription — MuJoCo + PyTorch can spawn too many.
+    for var in ("OMP_NUM_THREADS", "MKL_NUM_THREADS"):
+        if var not in os.environ:
+            os.environ[var] = str(min(os.cpu_count() or 4, 4))
 
     device = torch.device(args.device)
     torch.set_grad_enabled(False)
@@ -750,6 +1184,7 @@ def main():
     print(f"K:           {args.K}")
     print(f"DecisionInt: {args.decision_interval}")
     print(f"SkipFirst:   {args.skip_first}")
+    print(f"BranchHorz:  {args.branch_horizon or 'full'}")
     print(f"Device:      {device}")
     print(f"Eval oracle policy: {args.eval_oracle_policy}")
     print("=" * 70)
@@ -779,7 +1214,22 @@ def main():
     task_name = str(cfg_get(task_cfg, "task_name", "unknown_task"))
     dataset_path_cfg = str(cfg_get(task_cfg, "dataset_path"))
     dataset_path = resolve_existing_path(dataset_path_cfg)
-    env_factory, env_info = make_robomimic_env_factory(cfg, dataset_path=dataset_path)
+
+    # Resolve action mode before creating envs (controller patches depend on it).
+    abs_action_cfg = bool(cfg_get(task_cfg, "abs_action", False))
+    if args.action_mode == "abs":
+        abs_action = True
+    elif args.action_mode == "delta":
+        abs_action = False
+    else:
+        abs_action = abs_action_cfg
+    rotation_transformer = RotationTransformer("axis_angle", "rotation_6d") if abs_action else None
+
+    env_factory, env_info = make_robomimic_env_factory(
+        cfg, dataset_path=dataset_path,
+        abs_action_override=abs_action if args.action_mode != "auto" else None,
+        kp=args.kp,
+    )
 
     n_obs_steps = int(cfg_get(task_cfg.env_runner, "n_obs_steps"))
     n_action_steps = int(cfg_get(task_cfg.env_runner, "n_action_steps"))
@@ -792,8 +1242,23 @@ def main():
     cfg_max_steps = int(cfg_get(task_cfg.env_runner, "max_steps", 400))
     max_env_steps = int(args.max_env_steps) if args.max_env_steps is not None else cfg_max_steps
 
-    abs_action = bool(cfg_get(task_cfg, "abs_action", False))
-    rotation_transformer = RotationTransformer("axis_angle", "rotation_6d") if abs_action else None
+    # Load dataset initial states for robomimic-style evaluation.
+    demo_keys: List[str] = []
+    h5_file = None
+    init_state_fn = None
+    if args.reset_to_dataset_init:
+        h5_file = h5py.File(str(dataset_path), "r")
+        demo_keys = sorted(h5_file["data"].keys())
+        if not demo_keys:
+            raise RuntimeError(f"No demos found in dataset: {dataset_path}")
+
+        def sample_init_state(seed: int) -> np.ndarray:
+            rng = np.random.RandomState(seed)
+            demo = demo_keys[int(rng.randint(0, len(demo_keys)))]
+            return np.array(h5_file["data"][demo]["states"][0], copy=True)
+
+        init_state_fn = sample_init_state
+        print(f"DatasetInit: {len(demo_keys)} demos available")
 
     print(f"PolicyClass: {policy_class}")
     print(f"PolicyTarget:{policy_target}")
@@ -805,63 +1270,173 @@ def main():
     print(f"ActionSteps: {n_action_steps}")
     print(f"Latency:     {n_latency_steps}")
     print(f"MaxEnvSteps: {max_env_steps}")
-    print(f"AbsAction:   {abs_action}")
+    print(f"AbsAction:   {abs_action} (cfg={abs_action_cfg}, override={args.action_mode})")
+
+    # Extract obs_keys for gripper_to_cube sign fix (robosuite 1.5.2 compat).
+    lowdim_obs_keys = env_info.get("obs_keys", None)
+    print(f"Kp:          {args.kp}")
+    print(f"ResetToData: {args.reset_to_dataset_init}")
+    if args.perturb != "none":
+        print(f"Perturb:     {args.perturb} (start_step={args.perturb_start_step})")
+        if args.perturb == "noise_object":
+            print(f"NoiseStd:    {args.perturb_noise_std}")
     print(f"TAP commit:  {tap_git_hash}")
     print(f"DP commit:   {dp_git_hash}")
 
     # Pre-create branch pool for candidate scoring.
     branch_envs = [env_factory() for _ in range(args.K)]
 
+    # Verify absolute-action controller patch is active.
+    if abs_action:
+        try:
+            ctrl = branch_envs[0].env.env.robots[0].part_controllers["right"]
+            print(f"Controller:  {type(ctrl).__name__}  input_type={ctrl.input_type}  ref_frame={ctrl.input_ref_frame}")
+            assert ctrl.input_type == "absolute", (
+                f"FATAL: controller input_type is '{ctrl.input_type}', expected 'absolute'. "
+                "The abs_action patch did not apply."
+            )
+            assert ctrl.input_ref_frame == "world", (
+                f"FATAL: controller input_ref_frame is '{ctrl.input_ref_frame}', expected 'world'. "
+                "The abs_action patch did not apply."
+            )
+        except (AttributeError, KeyError) as exc:
+            print(f"WARNING: Could not verify controller input_type: {exc}")
+
     seeds = list(range(args.seed_offset, args.seed_offset + args.n_episodes))
+
+    # ── Checkpoint / resume logic ──
+    output_path = Path(args.output) if args.output else Path(
+        f"eval_results/robomimic_headroom_{task_name}_K{args.K}_n{args.n_episodes}.json"
+    )
+    ckpt_path = _checkpoint_path(output_path)
+    args_dict = {
+        "dp_checkpoint": args.dp_checkpoint,
+        "K": args.K,
+        "decision_interval": args.decision_interval,
+        "skip_first": args.skip_first,
+        "n_episodes": args.n_episodes,
+        "seed_offset": args.seed_offset,
+        "continuation_seed": args.continuation_seed,
+        "kp": args.kp,
+        "perturb": args.perturb,
+        "perturb_start_step": args.perturb_start_step,
+        "perturb_noise_std": args.perturb_noise_std,
+        "action_mode": args.action_mode,
+        "reset_to_dataset_init": args.reset_to_dataset_init,
+        "branch_horizon": args.branch_horizon,
+    }
+
     baseline_episodes = []
     decision_points = []
     oracle_episode_summaries = []
+    completed_baseline_seeds: List[int] = []
+    completed_oracle_seeds: List[int] = []
+    start_phase = "baseline"
 
-    for seed in tqdm(seeds, desc="Baseline episodes"):
-        result = run_episode(
-            seed=seed,
-            choose_mode="k0",
-            log_decisions=True,
-            log_candidates=args.log_candidates,
-            env_factory=env_factory,
-            branch_envs=branch_envs,
-            dp_policy=dp_policy,
-            K=args.K,
-            n_obs_steps=n_obs_steps,
-            n_latency_steps=n_latency_steps,
-            decision_interval=args.decision_interval,
-            skip_first=args.skip_first,
-            max_env_steps=max_env_steps,
-            abs_action=abs_action,
-            rotation_transformer=rotation_transformer,
-            device=device,
-            continuation_seed=args.continuation_seed,
-        )
-        baseline_episodes.append(result["summary"])
-        decision_points.extend(result["decision_points"])
+    if args.resume:
+        ckpt = load_checkpoint(ckpt_path, args_dict)
+        if ckpt is not None:
+            baseline_episodes = ckpt["baseline_episodes"]
+            decision_points = ckpt["decision_points"]
+            oracle_episode_summaries = ckpt["oracle_episode_summaries"]
+            completed_baseline_seeds = ckpt["completed_baseline_seeds"]
+            completed_oracle_seeds = ckpt["completed_oracle_seeds"]
+            start_phase = ckpt["phase"]
+            n_bl = len(completed_baseline_seeds)
+            n_or = len(completed_oracle_seeds)
+            print(f"Resumed from checkpoint: {n_bl} baseline, {n_or} oracle episodes done.")
 
-    if args.eval_oracle_policy:
-        for seed in tqdm(seeds, desc="Oracle episodes"):
-            result = run_episode(
-                seed=seed,
-                choose_mode="oracle",
-                log_decisions=False,
-                log_candidates=False,
-                env_factory=env_factory,
-                branch_envs=branch_envs,
-                dp_policy=dp_policy,
-                K=args.K,
-                n_obs_steps=n_obs_steps,
-                n_latency_steps=n_latency_steps,
-                decision_interval=args.decision_interval,
-                skip_first=args.skip_first,
-                max_env_steps=max_env_steps,
-                abs_action=abs_action,
-                rotation_transformer=rotation_transformer,
-                device=device,
-                continuation_seed=args.continuation_seed,
-            )
-            oracle_episode_summaries.append(result["summary"])
+    remaining_baseline = [s for s in seeds if s not in set(completed_baseline_seeds)]
+    remaining_oracle = [s for s in seeds if s not in set(completed_oracle_seeds)]
+
+    if start_phase == "baseline" and remaining_baseline:
+        total_bl = len(seeds)
+        done_bl = total_bl - len(remaining_baseline)
+        with torch.inference_mode():
+            for seed in tqdm(remaining_baseline, desc="Baseline episodes",
+                             initial=done_bl, total=total_bl):
+                ep_t0 = time.perf_counter()
+                result = run_episode(
+                    seed=seed,
+                    choose_mode="k0",
+                    log_decisions=True,
+                    log_candidates=args.log_candidates,
+                    env_factory=env_factory,
+                    branch_envs=branch_envs,
+                    dp_policy=dp_policy,
+                    K=args.K,
+                    n_obs_steps=n_obs_steps,
+                    n_latency_steps=n_latency_steps,
+                    decision_interval=args.decision_interval,
+                    skip_first=args.skip_first,
+                    max_env_steps=max_env_steps,
+                    abs_action=abs_action,
+                    rotation_transformer=rotation_transformer,
+                    device=device,
+                    continuation_seed=args.continuation_seed,
+                    branch_horizon=args.branch_horizon,
+                    init_state_fn=init_state_fn,
+                    obs_keys=lowdim_obs_keys,
+                    task_name=task_name,
+                    perturb_type=args.perturb,
+                    perturb_start_step=args.perturb_start_step,
+                    perturb_rng=np.random.RandomState(seed) if args.perturb == "noise_object" else None,
+                    perturb_noise_std=args.perturb_noise_std,
+                )
+                ep_dt = time.perf_counter() - ep_t0
+                n_dp = result["summary"]["n_decision_points"]
+                print(f"  [seed={seed}] {ep_dt:.1f}s  dps={n_dp}  ret={result['summary']['episode_return']:.3f}", flush=True)
+                baseline_episodes.append(result["summary"])
+                decision_points.extend(result["decision_points"])
+                completed_baseline_seeds.append(seed)
+                save_checkpoint(ckpt_path, "baseline", baseline_episodes,
+                                decision_points, oracle_episode_summaries,
+                                completed_baseline_seeds, completed_oracle_seeds, args_dict)
+    elif remaining_baseline:
+        # start_phase is "oracle" but baseline not finished — shouldn't happen
+        pass
+
+    if args.eval_oracle_policy and remaining_oracle:
+        total_or = len(seeds)
+        done_or = total_or - len(remaining_oracle)
+        with torch.inference_mode():
+            for seed in tqdm(remaining_oracle, desc="Oracle episodes",
+                             initial=done_or, total=total_or):
+                ep_t0 = time.perf_counter()
+                result = run_episode(
+                    seed=seed,
+                    choose_mode="oracle",
+                    log_decisions=False,
+                    log_candidates=False,
+                    env_factory=env_factory,
+                    branch_envs=branch_envs,
+                    dp_policy=dp_policy,
+                    K=args.K,
+                    n_obs_steps=n_obs_steps,
+                    n_latency_steps=n_latency_steps,
+                    decision_interval=args.decision_interval,
+                    skip_first=args.skip_first,
+                    max_env_steps=max_env_steps,
+                    abs_action=abs_action,
+                    rotation_transformer=rotation_transformer,
+                    device=device,
+                    continuation_seed=args.continuation_seed,
+                    branch_horizon=args.branch_horizon,
+                    init_state_fn=init_state_fn,
+                    obs_keys=lowdim_obs_keys,
+                    task_name=task_name,
+                    perturb_type=args.perturb,
+                    perturb_start_step=args.perturb_start_step,
+                    perturb_rng=np.random.RandomState(seed) if args.perturb == "noise_object" else None,
+                    perturb_noise_std=args.perturb_noise_std,
+                )
+                ep_dt = time.perf_counter() - ep_t0
+                print(f"  [seed={seed}] {ep_dt:.1f}s  ret={result['summary']['episode_return']:.3f}", flush=True)
+                oracle_episode_summaries.append(result["summary"])
+                completed_oracle_seeds.append(seed)
+                save_checkpoint(ckpt_path, "oracle", baseline_episodes,
+                                decision_points, oracle_episode_summaries,
+                                completed_baseline_seeds, completed_oracle_seeds, args_dict)
 
     # Global aggregates
     spreads = np.array(
@@ -992,6 +1567,10 @@ def main():
             "max_env_steps": int(max_env_steps),
             "seed_offset": int(args.seed_offset),
             "continuation_seed": int(args.continuation_seed),
+            "abs_action": bool(abs_action),
+            "kp": float(args.kp),
+            "reset_to_dataset_init": bool(args.reset_to_dataset_init),
+            "branch_horizon": args.branch_horizon,
             "eval_oracle_policy": bool(args.eval_oracle_policy),
             "log_candidates": bool(args.log_candidates),
             "thresholds": {
@@ -1030,16 +1609,21 @@ def main():
         "decision_points": decision_points,
     }
 
-    output_path = Path(args.output) if args.output else Path(
-        f"eval_results/robomimic_headroom_{task_name}_K{args.K}_n{args.n_episodes}.json"
-    )
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(report, f, indent=2)
 
+    # Clean up checkpoint now that final output is written.
+    if ckpt_path.is_file():
+        ckpt_path.unlink()
+        print(f"Removed checkpoint: {ckpt_path}")
+
     for env in branch_envs:
         if hasattr(env, "close"):
             env.close()
+
+    if h5_file is not None:
+        h5_file.close()
 
     print("\n" + "=" * 70)
     print("Audit Complete")

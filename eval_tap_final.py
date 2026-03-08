@@ -38,6 +38,7 @@ def load_model(checkpoint_path, device):
         obs_type=config.get("obs_type", "image"),
         obs_dim=config.get("obs_dim"),
         use_deltas=config.get("use_deltas", False),
+        learnable_temperature=config.get("learnable_temperature", False),
     )
     model.load_state_dict(checkpoint['model_state_dict'])
     model.to(device)
@@ -360,7 +361,7 @@ def main():
     labels = [0] * len(success_tap) + [1] * len(failure_tap)
     tap_auroc_raw = roc_auc_score(labels, [-s for s in all_tap])
     tap_auroc = max(tap_auroc_raw, 1 - tap_auroc_raw)
-    tap_orientation = "lower margin → failure" if tap_auroc_raw >= 0.5 else "higher margin → failure"
+    tap_orientation = "lower margin -> failure" if tap_auroc_raw >= 0.5 else "higher margin -> failure"
 
     # Baseline: action magnitude
     all_mag = success_mag + failure_mag
@@ -385,8 +386,8 @@ def main():
     # Determine score orientation from AUROC computation
     score_flipped = tap_auroc_raw < 0.5  # If true, higher scores indicate failure
 
-    print(f"\n(Using orientation: {'higher' if score_flipped else 'lower'} score → failure)")
-    print("\n| FPR Target | Threshold τ | TPR (Detection Rate) |")
+    print(f"\n(Using orientation: {'higher' if score_flipped else 'lower'} score -> failure)")
+    print("\n| FPR Target | Threshold t | TPR (Detection Rate) |")
     print("|------------|-------------|----------------------|")
 
     for target_fpr in target_fprs:
@@ -477,23 +478,24 @@ def main():
     print("SUMMARY TABLE")
     print("=" * 70)
 
-    print("""
-┌────────────────────────────────────────────────────────────────────┐
-│                      CONTRASTIVE TAP RESULTS                       │
-├────────────────────────────────────────────────────────────────────┤""")
-    print(f"│ Held-out Failure AUROC:        {tap_auroc:.3f}                            │")
-    print(f"│ Prefix-Only AUROC:             {prefix_auroc:.3f}  (early warning)            │" if 'prefix_auroc' in dir() else "")
-    print(f"│ Action Magnitude Baseline:     {mag_auroc:.3f}                            │")
-    print(f"│ TAP advantage:                +{tap_auroc - mag_auroc:.3f} (absolute AUROC)           │")
-    print("""├────────────────────────────────────────────────────────────────────┤
-│ OPERATING POINTS                                                   │""")
+    print("")
+    print("+--------------------------------------------------------------------+")
+    print("|                      CONTRASTIVE TAP RESULTS                       |")
+    print("+--------------------------------------------------------------------+")
+    print(f"| Held-out Failure AUROC:        {tap_auroc:.3f}                            |")
+    if 'prefix_auroc' in dir():
+        print(f"| Prefix-Only AUROC:             {prefix_auroc:.3f}  (early warning)            |")
+    print(f"| Action Magnitude Baseline:     {mag_auroc:.3f}                            |")
+    print(f"| TAP advantage:                +{tap_auroc - mag_auroc:.3f} (absolute AUROC)           |")
+    print("+--------------------------------------------------------------------+")
+    print("| OPERATING POINTS                                                   |")
     for fpr_str, vals in operating_points.items():
-        print(f"│ TPR @ {fpr_str} FPR:               {vals['tpr']*100:5.1f}%                           │")
-    print("""├────────────────────────────────────────────────────────────────────┤
-│ M ABLATION (stability)                                             │""")
+        print(f"| TPR @ {fpr_str} FPR:               {vals['tpr']*100:5.1f}%                           |")
+    print("+--------------------------------------------------------------------+")
+    print("| M ABLATION (stability)                                             |")
     for m, auroc in m_results.items():
-        print(f"│ M = {m:2}:                        {auroc:.3f}                            │")
-    print("""└────────────────────────────────────────────────────────────────────┘""")
+        print(f"| M = {m:2}:                        {auroc:.3f}                            |")
+    print("+--------------------------------------------------------------------+")
 
     print("\nTraining negatives: noise, permute, mirror, random")
     print("Held-out failures:  scaling, bias, stuck, delayed")

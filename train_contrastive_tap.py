@@ -84,6 +84,14 @@ def main():
     parser.add_argument("--use_deltas", action="store_true", help="Use delta encoding for state observations")
     parser.add_argument("--use_nn_negatives", action="store_true", help="Use nearest-neighbor hard negatives for state obs")
     parser.add_argument("--nn_negative_ratio", type=float, default=0.3, help="Fraction of negatives from NN states")
+    parser.add_argument("--dp_neg_cache", type=str, default=None,
+                        help="NPZ cache of DP-proposal negatives (triggers real-negative mode)")
+    parser.add_argument("--dp_neg_mixture", action="store_true",
+                        help="Mixture mode: expert positives + synthetic + DP negatives")
+    parser.add_argument("--dp_neg_ratio", type=float, default=0.3,
+                        help="Fraction of negatives from DP cross-obs proposals (mixture mode)")
+    parser.add_argument("--learnable_temperature", action="store_true",
+                        help="Make InfoNCE temperature a learnable parameter")
     parser.add_argument("--device", type=str, default="cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
     args = parser.parse_args()
 
@@ -133,10 +141,22 @@ def main():
         dataloader_kwargs['use_nn_negatives'] = args.use_nn_negatives
         dataloader_kwargs['nn_negative_ratio'] = args.nn_negative_ratio
 
+    # Pass data_format and obs_keys from benchmark config
+    data_format = benchmark_config.get('data_format', 'zarr')
+    if 'obs_keys' in benchmark_config:
+        dataloader_kwargs['obs_keys'] = benchmark_config['obs_keys']
+
+    # Add mixture-mode kwargs
+    if args.dp_neg_mixture:
+        dataloader_kwargs['dp_neg_ratio'] = args.dp_neg_ratio
+
     train_loader, val_loader = create_contrastive_dataloaders(
         args.data_dir,
         batch_size=args.batch_size,
         obs_type=obs_type,
+        data_format=data_format,
+        dp_neg_cache=args.dp_neg_cache,
+        dp_neg_mixture=args.dp_neg_mixture,
         **dataloader_kwargs,
     )
     print(f"Train batches: {len(train_loader)}, Val batches: {len(val_loader)}")
@@ -145,9 +165,14 @@ def main():
     action_dim = train_loader.dataset.action_dim
     print(f"Auto-detected action_dim: {action_dim}")
 
+    # Auto-detect action_chunk from DP-neg dataset if applicable.
+    if args.dp_neg_cache is not None and hasattr(train_loader.dataset, 'action_chunk'):
+        args.action_chunk = train_loader.dataset.action_chunk
+        print(f"Auto-detected action_chunk from cache: {args.action_chunk}")
+
     # Get obs_dim from dataset for state observations
     obs_dim = None
-    if obs_type == 'state':
+    if obs_type == 'state' or args.dp_neg_cache is not None:
         obs_dim = train_loader.dataset.obs_dim
         print(f"Auto-detected obs_dim: {obs_dim}")
 
@@ -160,15 +185,16 @@ def main():
         "action_chunk": args.action_chunk,
         "hidden_dim": args.hidden_dim,
         "temperature": args.temperature,
-        "obs_type": obs_type,
+        "obs_type": obs_type if args.dp_neg_cache is None else 'state',
         "obs_dim": obs_dim,
         "use_deltas": args.use_deltas if obs_type == 'state' else False,
+        "learnable_temperature": args.learnable_temperature,
     }
     model = build_contrastive_tap_model(config).to(device)
 
     num_params = sum(p.numel() for p in model.parameters())
     print(f"Model parameters: {num_params:,}")
-    print(f"Temperature: {args.temperature}")
+    print(f"Temperature: {args.temperature} ({'learnable' if args.learnable_temperature else 'fixed'})")
 
     # Optimizer
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=0.01)
@@ -193,18 +219,24 @@ def main():
         scheduler.step()
         current_lr = scheduler.get_last_lr()[0]
 
+        temp_str = ""
+        if args.learnable_temperature:
+            temp_str = f" - Temp: {model.get_temperature():.4f}"
         print(f"Epoch {epoch+1}/{args.epochs} - LR: {current_lr:.2e} - "
               f"Train Loss: {train_loss:.4f}, Train Acc: {train_acc:.3f} - "
-              f"Val Loss: {val_loss:.4f}, Val Acc: {val_acc:.3f}")
+              f"Val Loss: {val_loss:.4f}, Val Acc: {val_acc:.3f}{temp_str}")
 
-        history.append({
+        epoch_record = {
             "epoch": epoch + 1,
             "lr": current_lr,
             "train_loss": train_loss,
             "train_acc": train_acc,
             "val_loss": val_loss,
             "val_acc": val_acc,
-        })
+        }
+        if args.learnable_temperature:
+            epoch_record["temperature"] = model.get_temperature()
+        history.append(epoch_record)
 
         # Save best model
         if val_acc > best_val_acc:

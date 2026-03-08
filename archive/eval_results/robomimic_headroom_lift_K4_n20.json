@@ -1,0 +1,2922 @@
+{
+  "meta": {
+    "script": "scripts/robomimic_headroom_audit.py",
+    "timestamp_unix": 1772484175.369125,
+    "elapsed_sec": 3562.321957400003
+  },
+  "config": {
+    "dp_checkpoint": "data\\robomimic\\checkpoints\\lift_ph_diffusion_policy_cnn.ckpt",
+    "policy_class": "DiffusionUnetLowdimPolicy",
+    "policy_target": "diffusion_policy.workspace.train_diffusion_unet_lowdim_workspace.TrainDiffusionUnetLowdimWorkspace",
+    "horizon": 16,
+    "task_name": "lift",
+    "dataset_path": "C:\\Users\\neilt\\OneDrive\\Documents\\TAP-Score\\data\\robomimic\\datasets\\lift\\ph\\low_dim_abs.hdf5",
+    "env_mode": "lowdim",
+    "device": "cuda",
+    "tap_git_hash": "1581336",
+    "dp_git_hash": "5ba07ac",
+    "n_episodes": 20,
+    "K": 4,
+    "n_obs_steps": 2,
+    "n_action_steps": 8,
+    "n_latency_steps": 0,
+    "decision_interval": 10,
+    "skip_first": 2,
+    "max_env_steps": 400,
+    "seed_offset": 0,
+    "continuation_seed": 12345,
+    "eval_oracle_policy": true,
+    "log_candidates": false,
+    "thresholds": {
+      "headroom_fraction_of_return_range": 0.01,
+      "success_gain_points": 0.02
+    }
+  },
+  "global_metrics": {
+    "n_decision_points": 100,
+    "candidate_return_range": {
+      "min": 0.0,
+      "max": 0.0,
+      "range": 0.0
+    },
+    "candidate_spread_l2_mean_pairwise": {
+      "mean": 0.6073433518661832,
+      "ci95_low": 0.4863294418744157,
+      "ci95_high": 0.7283572618579507,
+      "n": 100
+    },
+    "oracle_headroom_best_minus_mean": {
+      "mean": 0.0,
+      "ci95_low": 0.0,
+      "ci95_high": 0.0,
+      "n": 100
+    },
+    "oracle_headroom_best_minus_k0": {
+      "mean": 0.0,
+      "ci95_low": 0.0,
+      "ci95_high": 0.0,
+      "n": 100
+    },
+    "decision_success_k0": {
+      "mean": 0.0,
+      "ci95_low": 0.0,
+      "ci95_high": 0.0,
+      "n": 100
+    },
+    "decision_success_oracle": {
+      "mean": 0.0,
+      "ci95_low": 0.0,
+      "ci95_high": 0.0,
+      "n": 100
+    },
+    "decision_success_gain_oracle_minus_k0": {
+      "mean": 0.0,
+      "ci95_low": 0.0,
+      "ci95_high": 0.0,
+      "n": 100
+    },
+    "episode_success_k1": {
+      "mean": 0.0,
+      "ci95_low": 0.0,
+      "ci95_high": 0.0,
+      "n": 20
+    },
+    "episode_return_k1": {
+      "mean": 0.0,
+      "ci95_low": 0.0,
+      "ci95_high": 0.0,
+      "n": 20
+    },
+    "episode_success_oracle_policy": {
+      "mean": 0.0,
+      "ci95_low": 0.0,
+      "ci95_high": 0.0,
+      "n": 20
+    },
+    "episode_return_oracle_policy": {
+      "mean": 0.0,
+      "ci95_low": 0.0,
+      "ci95_high": 0.0,
+      "n": 20
+    },
+    "episode_success_gain_oracle_minus_k1": {
+      "mean": 0.0,
+      "ci95_low": 0.0,
+      "ci95_high": 0.0,
+      "n": 20
+    },
+    "gate_metrics": {
+      "headroom_threshold_abs": 0.0,
+      "success_gain_threshold": 0.02,
+      "success_gain_source": "episode_policy"
+    },
+    "fork_decision": "inconclusive",
+    "recommendation": "Signal is mixed. Run more episodes or tighten evaluation controls."
+  },
+  "episodes": [
+    {
+      "seed": 0,
+      "episode_return": 0.0,
+      "episode_success": false,
+      "n_decision_points": 5,
+      "mean_candidate_spread": 0.8189187411082033,
+      "mean_oracle_headroom_best_minus_mean": 0.0,
+      "mean_oracle_headroom_best_minus_k0": 0.0,
+      "mean_decision_success_gain_oracle_minus_k0": 0.0
+    },
+    {
+      "seed": 1,
+      "episode_return": 0.0,
+      "episode_success": false,
+      "n_decision_points": 5,
+      "mean_candidate_spread": 0.6748001389411528,
+      "mean_oracle_headroom_best_minus_mean": 0.0,
+      "mean_oracle_headroom_best_minus_k0": 0.0,
+      "mean_decision_success_gain_oracle_minus_k0": 0.0
+    },
+    {
+      "seed": 2,
+      "episode_return": 0.0,
+      "episode_success": false,
+      "n_decision_points": 5,
+      "mean_candidate_spread": 1.2830311445684162,
+      "mean_oracle_headroom_best_minus_mean": 0.0,
+      "mean_oracle_headroom_best_minus_k0": 0.0,
+      "mean_decision_success_gain_oracle_minus_k0": 0.0
+    },
+    {
+      "seed": 3,
+      "episode_return": 0.0,
+      "episode_success": false,
+      "n_decision_points": 5,
+      "mean_candidate_spread": 0.7408661024209284,
+      "mean_oracle_headroom_best_minus_mean": 0.0,
+      "mean_oracle_headroom_best_minus_k0": 0.0,
+      "mean_decision_success_gain_oracle_minus_k0": 0.0
+    },
+    {
+      "seed": 4,
+      "episode_return": 0.0,
+      "episode_success": false,
+      "n_decision_points": 5,
+      "mean_candidate_spread": 0.052344942641738945,
+      "mean_oracle_headroom_best_minus_mean": 0.0,
+      "mean_oracle_headroom_best_minus_k0": 0.0,
+      "mean_decision_success_gain_oracle_minus_k0": 0.0
+    },
+    {
+      "seed": 5,
+      "episode_return": 0.0,
+      "episode_success": false,
+      "n_decision_points": 5,
+      "mean_candidate_spread": 0.4145453828293063,
+      "mean_oracle_headroom_best_minus_mean": 0.0,
+      "mean_oracle_headroom_best_minus_k0": 0.0,
+      "mean_decision_success_gain_oracle_minus_k0": 0.0
+    },
+    {
+      "seed": 6,
+      "episode_return": 0.0,
+      "episode_success": false,
+      "n_decision_points": 5,
+      "mean_candidate_spread": 0.38112626306165065,
+      "mean_oracle_headroom_best_minus_mean": 0.0,
+      "mean_oracle_headroom_best_minus_k0": 0.0,
+      "mean_decision_success_gain_oracle_minus_k0": 0.0
+    },
+    {
+      "seed": 7,
+      "episode_return": 0.0,
+      "episode_success": false,
+      "n_decision_points": 5,
+      "mean_candidate_spread": 0.4628168484753802,
+      "mean_oracle_headroom_best_minus_mean": 0.0,
+      "mean_oracle_headroom_best_minus_k0": 0.0,
+      "mean_decision_success_gain_oracle_minus_k0": 0.0
+    },
+    {
+      "seed": 8,
+      "episode_return": 0.0,
+      "episode_success": false,
+      "n_decision_points": 5,
+      "mean_candidate_spread": 0.45995923353281254,
+      "mean_oracle_headroom_best_minus_mean": 0.0,
+      "mean_oracle_headroom_best_minus_k0": 0.0,
+      "mean_decision_success_gain_oracle_minus_k0": 0.0
+    },
+    {
+      "seed": 9,
+      "episode_return": 0.0,
+      "episode_success": false,
+      "n_decision_points": 5,
+      "mean_candidate_spread": 0.6687650950836956,
+      "mean_oracle_headroom_best_minus_mean": 0.0,
+      "mean_oracle_headroom_best_minus_k0": 0.0,
+      "mean_decision_success_gain_oracle_minus_k0": 0.0
+    },
+    {
+      "seed": 10,
+      "episode_return": 0.0,
+      "episode_success": false,
+      "n_decision_points": 5,
+      "mean_candidate_spread": 0.9042337730012934,
+      "mean_oracle_headroom_best_minus_mean": 0.0,
+      "mean_oracle_headroom_best_minus_k0": 0.0,
+      "mean_decision_success_gain_oracle_minus_k0": 0.0
+    },
+    {
+      "seed": 11,
+      "episode_return": 0.0,
+      "episode_success": false,
+      "n_decision_points": 5,
+      "mean_candidate_spread": 0.29552607715878065,
+      "mean_oracle_headroom_best_minus_mean": 0.0,
+      "mean_oracle_headroom_best_minus_k0": 0.0,
+      "mean_decision_success_gain_oracle_minus_k0": 0.0
+    },
+    {
+      "seed": 12,
+      "episode_return": 0.0,
+      "episode_success": false,
+      "n_decision_points": 5,
+      "mean_candidate_spread": 0.7451372873512832,
+      "mean_oracle_headroom_best_minus_mean": 0.0,
+      "mean_oracle_headroom_best_minus_k0": 0.0,
+      "mean_decision_success_gain_oracle_minus_k0": 0.0
+    },
+    {
+      "seed": 13,
+      "episode_return": 0.0,
+      "episode_success": false,
+      "n_decision_points": 5,
+      "mean_candidate_spread": 0.6837047638370304,
+      "mean_oracle_headroom_best_minus_mean": 0.0,
+      "mean_oracle_headroom_best_minus_k0": 0.0,
+      "mean_decision_success_gain_oracle_minus_k0": 0.0
+    },
+    {
+      "seed": 14,
+      "episode_return": 0.0,
+      "episode_success": false,
+      "n_decision_points": 5,
+      "mean_candidate_spread": 0.1049630242668824,
+      "mean_oracle_headroom_best_minus_mean": 0.0,
+      "mean_oracle_headroom_best_minus_k0": 0.0,
+      "mean_decision_success_gain_oracle_minus_k0": 0.0
+    },
+    {
+      "seed": 15,
+      "episode_return": 0.0,
+      "episode_success": false,
+      "n_decision_points": 5,
+      "mean_candidate_spread": 1.0756216663401468,
+      "mean_oracle_headroom_best_minus_mean": 0.0,
+      "mean_oracle_headroom_best_minus_k0": 0.0,
+      "mean_decision_success_gain_oracle_minus_k0": 0.0
+    },
+    {
+      "seed": 16,
+      "episode_return": 0.0,
+      "episode_success": false,
+      "n_decision_points": 5,
+      "mean_candidate_spread": 0.5097779479846241,
+      "mean_oracle_headroom_best_minus_mean": 0.0,
+      "mean_oracle_headroom_best_minus_k0": 0.0,
+      "mean_decision_success_gain_oracle_minus_k0": 0.0
+    },
+    {
+      "seed": 17,
+      "episode_return": 0.0,
+      "episode_success": false,
+      "n_decision_points": 5,
+      "mean_candidate_spread": 0.7779699321352993,
+      "mean_oracle_headroom_best_minus_mean": 0.0,
+      "mean_oracle_headroom_best_minus_k0": 0.0,
+      "mean_decision_success_gain_oracle_minus_k0": 0.0
+    },
+    {
+      "seed": 18,
+      "episode_return": 0.0,
+      "episode_success": false,
+      "n_decision_points": 5,
+      "mean_candidate_spread": 0.5393374352154644,
+      "mean_oracle_headroom_best_minus_mean": 0.0,
+      "mean_oracle_headroom_best_minus_k0": 0.0,
+      "mean_decision_success_gain_oracle_minus_k0": 0.0
+    },
+    {
+      "seed": 19,
+      "episode_return": 0.0,
+      "episode_success": false,
+      "n_decision_points": 5,
+      "mean_candidate_spread": 0.5534212373695719,
+      "mean_oracle_headroom_best_minus_mean": 0.0,
+      "mean_oracle_headroom_best_minus_k0": 0.0,
+      "mean_decision_success_gain_oracle_minus_k0": 0.0
+    }
+  ],
+  "oracle_policy_episodes": [
+    {
+      "seed": 0,
+      "episode_return": 0.0,
+      "episode_success": false,
+      "n_decision_points": 0,
+      "mean_candidate_spread": 0.0,
+      "mean_oracle_headroom_best_minus_mean": 0.0,
+      "mean_oracle_headroom_best_minus_k0": 0.0,
+      "mean_decision_success_gain_oracle_minus_k0": 0.0
+    },
+    {
+      "seed": 1,
+      "episode_return": 0.0,
+      "episode_success": false,
+      "n_decision_points": 0,
+      "mean_candidate_spread": 0.0,
+      "mean_oracle_headroom_best_minus_mean": 0.0,
+      "mean_oracle_headroom_best_minus_k0": 0.0,
+      "mean_decision_success_gain_oracle_minus_k0": 0.0
+    },
+    {
+      "seed": 2,
+      "episode_return": 0.0,
+      "episode_success": false,
+      "n_decision_points": 0,
+      "mean_candidate_spread": 0.0,
+      "mean_oracle_headroom_best_minus_mean": 0.0,
+      "mean_oracle_headroom_best_minus_k0": 0.0,
+      "mean_decision_success_gain_oracle_minus_k0": 0.0
+    },
+    {
+      "seed": 3,
+      "episode_return": 0.0,
+      "episode_success": false,
+      "n_decision_points": 0,
+      "mean_candidate_spread": 0.0,
+      "mean_oracle_headroom_best_minus_mean": 0.0,
+      "mean_oracle_headroom_best_minus_k0": 0.0,
+      "mean_decision_success_gain_oracle_minus_k0": 0.0
+    },
+    {
+      "seed": 4,
+      "episode_return": 0.0,
+      "episode_success": false,
+      "n_decision_points": 0,
+      "mean_candidate_spread": 0.0,
+      "mean_oracle_headroom_best_minus_mean": 0.0,
+      "mean_oracle_headroom_best_minus_k0": 0.0,
+      "mean_decision_success_gain_oracle_minus_k0": 0.0
+    },
+    {
+      "seed": 5,
+      "episode_return": 0.0,
+      "episode_success": false,
+      "n_decision_points": 0,
+      "mean_candidate_spread": 0.0,
+      "mean_oracle_headroom_best_minus_mean": 0.0,
+      "mean_oracle_headroom_best_minus_k0": 0.0,
+      "mean_decision_success_gain_oracle_minus_k0": 0.0
+    },
+    {
+      "seed": 6,
+      "episode_return": 0.0,
+      "episode_success": false,
+      "n_decision_points": 0,
+      "mean_candidate_spread": 0.0,
+      "mean_oracle_headroom_best_minus_mean": 0.0,
+      "mean_oracle_headroom_best_minus_k0": 0.0,
+      "mean_decision_success_gain_oracle_minus_k0": 0.0
+    },
+    {
+      "seed": 7,
+      "episode_return": 0.0,
+      "episode_success": false,
+      "n_decision_points": 0,
+      "mean_candidate_spread": 0.0,
+      "mean_oracle_headroom_best_minus_mean": 0.0,
+      "mean_oracle_headroom_best_minus_k0": 0.0,
+      "mean_decision_success_gain_oracle_minus_k0": 0.0
+    },
+    {
+      "seed": 8,
+      "episode_return": 0.0,
+      "episode_success": false,
+      "n_decision_points": 0,
+      "mean_candidate_spread": 0.0,
+      "mean_oracle_headroom_best_minus_mean": 0.0,
+      "mean_oracle_headroom_best_minus_k0": 0.0,
+      "mean_decision_success_gain_oracle_minus_k0": 0.0
+    },
+    {
+      "seed": 9,
+      "episode_return": 0.0,
+      "episode_success": false,
+      "n_decision_points": 0,
+      "mean_candidate_spread": 0.0,
+      "mean_oracle_headroom_best_minus_mean": 0.0,
+      "mean_oracle_headroom_best_minus_k0": 0.0,
+      "mean_decision_success_gain_oracle_minus_k0": 0.0
+    },
+    {
+      "seed": 10,
+      "episode_return": 0.0,
+      "episode_success": false,
+      "n_decision_points": 0,
+      "mean_candidate_spread": 0.0,
+      "mean_oracle_headroom_best_minus_mean": 0.0,
+      "mean_oracle_headroom_best_minus_k0": 0.0,
+      "mean_decision_success_gain_oracle_minus_k0": 0.0
+    },
+    {
+      "seed": 11,
+      "episode_return": 0.0,
+      "episode_success": false,
+      "n_decision_points": 0,
+      "mean_candidate_spread": 0.0,
+      "mean_oracle_headroom_best_minus_mean": 0.0,
+      "mean_oracle_headroom_best_minus_k0": 0.0,
+      "mean_decision_success_gain_oracle_minus_k0": 0.0
+    },
+    {
+      "seed": 12,
+      "episode_return": 0.0,
+      "episode_success": false,
+      "n_decision_points": 0,
+      "mean_candidate_spread": 0.0,
+      "mean_oracle_headroom_best_minus_mean": 0.0,
+      "mean_oracle_headroom_best_minus_k0": 0.0,
+      "mean_decision_success_gain_oracle_minus_k0": 0.0
+    },
+    {
+      "seed": 13,
+      "episode_return": 0.0,
+      "episode_success": false,
+      "n_decision_points": 0,
+      "mean_candidate_spread": 0.0,
+      "mean_oracle_headroom_best_minus_mean": 0.0,
+      "mean_oracle_headroom_best_minus_k0": 0.0,
+      "mean_decision_success_gain_oracle_minus_k0": 0.0
+    },
+    {
+      "seed": 14,
+      "episode_return": 0.0,
+      "episode_success": false,
+      "n_decision_points": 0,
+      "mean_candidate_spread": 0.0,
+      "mean_oracle_headroom_best_minus_mean": 0.0,
+      "mean_oracle_headroom_best_minus_k0": 0.0,
+      "mean_decision_success_gain_oracle_minus_k0": 0.0
+    },
+    {
+      "seed": 15,
+      "episode_return": 0.0,
+      "episode_success": false,
+      "n_decision_points": 0,
+      "mean_candidate_spread": 0.0,
+      "mean_oracle_headroom_best_minus_mean": 0.0,
+      "mean_oracle_headroom_best_minus_k0": 0.0,
+      "mean_decision_success_gain_oracle_minus_k0": 0.0
+    },
+    {
+      "seed": 16,
+      "episode_return": 0.0,
+      "episode_success": false,
+      "n_decision_points": 0,
+      "mean_candidate_spread": 0.0,
+      "mean_oracle_headroom_best_minus_mean": 0.0,
+      "mean_oracle_headroom_best_minus_k0": 0.0,
+      "mean_decision_success_gain_oracle_minus_k0": 0.0
+    },
+    {
+      "seed": 17,
+      "episode_return": 0.0,
+      "episode_success": false,
+      "n_decision_points": 0,
+      "mean_candidate_spread": 0.0,
+      "mean_oracle_headroom_best_minus_mean": 0.0,
+      "mean_oracle_headroom_best_minus_k0": 0.0,
+      "mean_decision_success_gain_oracle_minus_k0": 0.0
+    },
+    {
+      "seed": 18,
+      "episode_return": 0.0,
+      "episode_success": false,
+      "n_decision_points": 0,
+      "mean_candidate_spread": 0.0,
+      "mean_oracle_headroom_best_minus_mean": 0.0,
+      "mean_oracle_headroom_best_minus_k0": 0.0,
+      "mean_decision_success_gain_oracle_minus_k0": 0.0
+    },
+    {
+      "seed": 19,
+      "episode_return": 0.0,
+      "episode_success": false,
+      "n_decision_points": 0,
+      "mean_candidate_spread": 0.0,
+      "mean_oracle_headroom_best_minus_mean": 0.0,
+      "mean_oracle_headroom_best_minus_k0": 0.0,
+      "mean_decision_success_gain_oracle_minus_k0": 0.0
+    }
+  ],
+  "decision_points": [
+    {
+      "seed": 0,
+      "policy_step": 2,
+      "env_step": 24,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 0.049797245338098824,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 0,
+      "policy_step": 12,
+      "env_step": 104,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 0.14061557735725913,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 0,
+      "policy_step": 22,
+      "env_step": 184,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 1.5173137741830496,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 0,
+      "policy_step": 32,
+      "env_step": 264,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 1.7516794385864423,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 0,
+      "policy_step": 42,
+      "env_step": 344,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 0.6351876700761664,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 1,
+      "policy_step": 2,
+      "env_step": 24,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 0.06508813735869241,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 1,
+      "policy_step": 12,
+      "env_step": 104,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 0.11096577356625618,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 1,
+      "policy_step": 22,
+      "env_step": 184,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 1.7564871897944716,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 1,
+      "policy_step": 32,
+      "env_step": 264,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 1.413024037779307,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 1,
+      "policy_step": 42,
+      "env_step": 344,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 0.02843555620703625,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 2,
+      "policy_step": 2,
+      "env_step": 24,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 0.043648625457129275,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 2,
+      "policy_step": 12,
+      "env_step": 104,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 1.416867974238089,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 2,
+      "policy_step": 22,
+      "env_step": 184,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 1.6731325750866193,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 2,
+      "policy_step": 32,
+      "env_step": 264,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 1.4340498981738268,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 2,
+      "policy_step": 42,
+      "env_step": 344,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 1.8474566498864171,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 3,
+      "policy_step": 2,
+      "env_step": 24,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 0.037295683900225376,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 3,
+      "policy_step": 12,
+      "env_step": 104,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 1.1831927453532485,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 3,
+      "policy_step": 22,
+      "env_step": 184,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 2.001339404892143,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 3,
+      "policy_step": 32,
+      "env_step": 264,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 0.3598732211432943,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 3,
+      "policy_step": 42,
+      "env_step": 344,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 0.12262945681573136,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 4,
+      "policy_step": 2,
+      "env_step": 24,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 0.06795709132713981,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 4,
+      "policy_step": 12,
+      "env_step": 104,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 0.03630716303560693,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 4,
+      "policy_step": 22,
+      "env_step": 184,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 0.05612941851082568,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 4,
+      "policy_step": 32,
+      "env_step": 264,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 0.051390645900890375,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 4,
+      "policy_step": 42,
+      "env_step": 344,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 0.04994039443423193,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 5,
+      "policy_step": 2,
+      "env_step": 24,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 0.0458021296427468,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 5,
+      "policy_step": 12,
+      "env_step": 104,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 0.11913133605644806,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 5,
+      "policy_step": 22,
+      "env_step": 184,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 0.5611472928531626,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 5,
+      "policy_step": 32,
+      "env_step": 264,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 1.1151468658706132,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 5,
+      "policy_step": 42,
+      "env_step": 344,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 0.23149928972356104,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 6,
+      "policy_step": 2,
+      "env_step": 24,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 0.03483823856721881,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 6,
+      "policy_step": 12,
+      "env_step": 104,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 0.39401158109732853,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 6,
+      "policy_step": 22,
+      "env_step": 184,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 1.0535061522804081,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 6,
+      "policy_step": 32,
+      "env_step": 264,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 0.31973385093494344,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 6,
+      "policy_step": 42,
+      "env_step": 344,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 0.1035414924283544,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 7,
+      "policy_step": 2,
+      "env_step": 24,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 0.04867558220287183,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 7,
+      "policy_step": 12,
+      "env_step": 104,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 0.1135093223585283,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 7,
+      "policy_step": 22,
+      "env_step": 184,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 0.8567045245869528,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 7,
+      "policy_step": 32,
+      "env_step": 264,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 0.6509793221002437,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 7,
+      "policy_step": 42,
+      "env_step": 344,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 0.6442154911283045,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 8,
+      "policy_step": 2,
+      "env_step": 24,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 0.061059698210784365,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 8,
+      "policy_step": 12,
+      "env_step": 104,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 0.07212339802517134,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 8,
+      "policy_step": 22,
+      "env_step": 184,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 0.4133625628245521,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 8,
+      "policy_step": 32,
+      "env_step": 264,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 0.4615030818506924,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 8,
+      "policy_step": 42,
+      "env_step": 344,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 1.2917474267528626,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 9,
+      "policy_step": 2,
+      "env_step": 24,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 0.05495308988352498,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 9,
+      "policy_step": 12,
+      "env_step": 104,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 0.10149459633615143,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 9,
+      "policy_step": 22,
+      "env_step": 184,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 0.2204118156625208,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 9,
+      "policy_step": 32,
+      "env_step": 264,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 1.5786928833338478,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 9,
+      "policy_step": 42,
+      "env_step": 344,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 1.3882730902024332,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 10,
+      "policy_step": 2,
+      "env_step": 24,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 0.039879817219784036,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 10,
+      "policy_step": 12,
+      "env_step": 104,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 0.443780712054622,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 10,
+      "policy_step": 22,
+      "env_step": 184,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 1.3144453842502777,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 10,
+      "policy_step": 32,
+      "env_step": 264,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 1.3264524410359164,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 10,
+      "policy_step": 42,
+      "env_step": 344,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 1.3966105104458666,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 11,
+      "policy_step": 2,
+      "env_step": 24,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 0.07134884221522708,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 11,
+      "policy_step": 12,
+      "env_step": 104,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 0.17587374041408602,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 11,
+      "policy_step": 22,
+      "env_step": 184,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 0.9413237029373627,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 11,
+      "policy_step": 32,
+      "env_step": 264,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 0.1009737940921841,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 11,
+      "policy_step": 42,
+      "env_step": 344,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 0.1881103061350434,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 12,
+      "policy_step": 2,
+      "env_step": 24,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 0.07199231315006929,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 12,
+      "policy_step": 12,
+      "env_step": 104,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 0.07375136651358243,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 12,
+      "policy_step": 22,
+      "env_step": 184,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 1.1769327697668055,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 12,
+      "policy_step": 32,
+      "env_step": 264,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 0.9857846286832491,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 12,
+      "policy_step": 42,
+      "env_step": 344,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 1.4172253586427093,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 13,
+      "policy_step": 2,
+      "env_step": 24,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 0.04564139798871265,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 13,
+      "policy_step": 12,
+      "env_step": 104,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 0.13902939274785195,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 13,
+      "policy_step": 22,
+      "env_step": 184,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 0.6085575517291336,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 13,
+      "policy_step": 32,
+      "env_step": 264,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 1.5645200393701828,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 13,
+      "policy_step": 42,
+      "env_step": 344,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 1.060775437349271,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 14,
+      "policy_step": 2,
+      "env_step": 24,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 0.046186004022647636,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 14,
+      "policy_step": 12,
+      "env_step": 104,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 0.1182006202983391,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 14,
+      "policy_step": 22,
+      "env_step": 184,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 0.13505132946130347,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 14,
+      "policy_step": 32,
+      "env_step": 264,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 0.11333821669934085,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 14,
+      "policy_step": 42,
+      "env_step": 344,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 0.11203895085278089,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 15,
+      "policy_step": 2,
+      "env_step": 24,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 0.04395896822248707,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 15,
+      "policy_step": 12,
+      "env_step": 104,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 0.850554297892563,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 15,
+      "policy_step": 22,
+      "env_step": 184,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 1.5835445948853881,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 15,
+      "policy_step": 32,
+      "env_step": 264,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 0.9528258067356573,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 15,
+      "policy_step": 42,
+      "env_step": 344,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 1.9472246639646384,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 16,
+      "policy_step": 2,
+      "env_step": 24,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 0.04057562026273189,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 16,
+      "policy_step": 12,
+      "env_step": 104,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 0.11522368466943893,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 16,
+      "policy_step": 22,
+      "env_step": 184,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 0.45153574079210945,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 16,
+      "policy_step": 32,
+      "env_step": 264,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 1.1093469353841654,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 16,
+      "policy_step": 42,
+      "env_step": 344,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 0.8322077588146747,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 17,
+      "policy_step": 2,
+      "env_step": 24,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 0.051922008700022414,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 17,
+      "policy_step": 12,
+      "env_step": 104,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 0.4155318379254238,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 17,
+      "policy_step": 22,
+      "env_step": 184,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 0.834229217808311,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 17,
+      "policy_step": 32,
+      "env_step": 264,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 1.0700014420685797,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 17,
+      "policy_step": 42,
+      "env_step": 344,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 1.5181651541741592,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 18,
+      "policy_step": 2,
+      "env_step": 24,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 0.04437919687976349,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 18,
+      "policy_step": 12,
+      "env_step": 104,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 0.13760949157102195,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 18,
+      "policy_step": 22,
+      "env_step": 184,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 0.7852111265075715,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 18,
+      "policy_step": 32,
+      "env_step": 264,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 0.9285073884826334,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 18,
+      "policy_step": 42,
+      "env_step": 344,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 0.8009799726363317,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 19,
+      "policy_step": 2,
+      "env_step": 24,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 0.04219595522087679,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 19,
+      "policy_step": 12,
+      "env_step": 104,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 0.13069703993605616,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 19,
+      "policy_step": 22,
+      "env_step": 184,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 2.2630100240273703,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 19,
+      "policy_step": 32,
+      "env_step": 264,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 0.08894921518388928,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    },
+    {
+      "seed": 19,
+      "policy_step": 42,
+      "env_step": 344,
+      "K": 4,
+      "candidate_spread_l2_mean_pairwise": 0.24225395247966727,
+      "candidate_returns": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "candidate_success": [
+        false,
+        false,
+        false,
+        false
+      ],
+      "candidate_logprobs": null,
+      "oracle_index": 0,
+      "chosen_index": 0,
+      "oracle_headroom_best_minus_mean": 0.0,
+      "oracle_headroom_best_minus_k0": 0.0
+    }
+  ]
+}

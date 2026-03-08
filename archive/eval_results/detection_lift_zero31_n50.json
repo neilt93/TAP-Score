@@ -1,0 +1,593 @@
+{
+  "n_episodes": 50,
+  "n_success": 22,
+  "n_fail": 28,
+  "auroc_min": 0.6574675324675324,
+  "auroc_mean": 0.6655844155844156,
+  "mag_baseline_auroc": 0.5454545454545454,
+  "bootstrap_ci": {
+    "auroc_min": {
+      "mean": 0.6569660874244793,
+      "ci_lo": 0.4919660829307569,
+      "ci_hi": 0.7987426788897377
+    },
+    "success_at_20pct": {
+      "mean": 0.596,
+      "ci_lo": 0.3,
+      "ci_hi": 1.0
+    },
+    "lead_time_median": {
+      "mean": 346.524,
+      "ci_lo": 272.0,
+      "ci_hi": 364.0
+    }
+  },
+  "abstention_curve": [
+    {
+      "coverage": 0.1,
+      "n_kept": 5,
+      "success_rate": 1.0
+    },
+    {
+      "coverage": 0.2,
+      "n_kept": 10,
+      "success_rate": 0.6
+    },
+    {
+      "coverage": 0.3,
+      "n_kept": 15,
+      "success_rate": 0.5333333333333333
+    },
+    {
+      "coverage": 0.4,
+      "n_kept": 20,
+      "success_rate": 0.55
+    },
+    {
+      "coverage": 0.5,
+      "n_kept": 25,
+      "success_rate": 0.52
+    },
+    {
+      "coverage": 0.6,
+      "n_kept": 30,
+      "success_rate": 0.5666666666666667
+    },
+    {
+      "coverage": 0.7,
+      "n_kept": 35,
+      "success_rate": 0.5142857142857142
+    },
+    {
+      "coverage": 0.8,
+      "n_kept": 40,
+      "success_rate": 0.475
+    },
+    {
+      "coverage": 0.9,
+      "n_kept": 45,
+      "success_rate": 0.4666666666666667
+    },
+    {
+      "coverage": 1.0,
+      "n_kept": 50,
+      "success_rate": 0.44
+    }
+  ],
+  "lead_time": {
+    "median": 352.0,
+    "q25": 226.0,
+    "q75": 368.0,
+    "mean": 292.0,
+    "n_detected": 20,
+    "n_fail_total": 28,
+    "threshold_used": -7.90400767326355
+  },
+  "perturb": "zero_object",
+  "perturb_start_step": 31,
+  "m_negatives": 15,
+  "tap_checkpoint": "checkpoints_contrastive/robomimic_lift_lowdim/contrastive_tap_best.pt",
+  "dp_checkpoint": "data/robomimic/checkpoints/lift_ph_diffusion_policy_cnn.ckpt",
+  "episode_results": [
+    {
+      "episode_id": 0,
+      "seed": 0,
+      "success": false,
+      "return": 0.0,
+      "n_scores": 46,
+      "min_score": -7.909074783325195,
+      "mean_score": -5.56236527795377,
+      "mean_action_mag": 3.356644039568694
+    },
+    {
+      "episode_id": 1,
+      "seed": 1,
+      "success": true,
+      "return": 8.0,
+      "n_scores": 46,
+      "min_score": -7.762341499328613,
+      "mean_score": -5.634124102799789,
+      "mean_action_mag": 3.355036434919938
+    },
+    {
+      "episode_id": 2,
+      "seed": 2,
+      "success": true,
+      "return": 1.0,
+      "n_scores": 46,
+      "min_score": -9.404961585998535,
+      "mean_score": -6.86842303690703,
+      "mean_action_mag": 3.2988580154336016
+    },
+    {
+      "episode_id": 3,
+      "seed": 3,
+      "success": true,
+      "return": 19.0,
+      "n_scores": 46,
+      "min_score": -7.607992649078369,
+      "mean_score": -5.6524002396542095,
+      "mean_action_mag": 3.355501563652702
+    },
+    {
+      "episode_id": 4,
+      "seed": 4,
+      "success": true,
+      "return": 5.0,
+      "n_scores": 46,
+      "min_score": -8.647032737731934,
+      "mean_score": -5.899382347645967,
+      "mean_action_mag": 3.352777491445127
+    },
+    {
+      "episode_id": 5,
+      "seed": 5,
+      "success": true,
+      "return": 12.0,
+      "n_scores": 46,
+      "min_score": -8.14207649230957,
+      "mean_score": -5.748867594677469,
+      "mean_action_mag": 3.3520823665287183
+    },
+    {
+      "episode_id": 6,
+      "seed": 6,
+      "success": true,
+      "return": 3.0,
+      "n_scores": 46,
+      "min_score": -9.099045753479004,
+      "mean_score": -6.879117571789285,
+      "mean_action_mag": 3.3028599179309346
+    },
+    {
+      "episode_id": 7,
+      "seed": 7,
+      "success": true,
+      "return": 14.0,
+      "n_scores": 46,
+      "min_score": -7.8392839431762695,
+      "mean_score": -5.764023599417313,
+      "mean_action_mag": 3.3549523301746533
+    },
+    {
+      "episode_id": 8,
+      "seed": 8,
+      "success": true,
+      "return": 8.0,
+      "n_scores": 46,
+      "min_score": -7.603488445281982,
+      "mean_score": -5.749569763307986,
+      "mean_action_mag": 3.3550035279730093
+    },
+    {
+      "episode_id": 9,
+      "seed": 9,
+      "success": false,
+      "return": 0.0,
+      "n_scores": 46,
+      "min_score": -7.64410924911499,
+      "mean_score": -5.665307915729025,
+      "mean_action_mag": 3.3619993562283725
+    },
+    {
+      "episode_id": 10,
+      "seed": 10,
+      "success": false,
+      "return": 0.0,
+      "n_scores": 46,
+      "min_score": -9.438936233520508,
+      "mean_score": -6.943480211755504,
+      "mean_action_mag": 3.30105169441389
+    },
+    {
+      "episode_id": 11,
+      "seed": 11,
+      "success": true,
+      "return": 6.0,
+      "n_scores": 46,
+      "min_score": -9.483292579650879,
+      "mean_score": -7.145685662393984,
+      "mean_action_mag": 3.299295726029769
+    },
+    {
+      "episode_id": 12,
+      "seed": 12,
+      "success": false,
+      "return": 0.0,
+      "n_scores": 46,
+      "min_score": -9.158956527709961,
+      "mean_score": -7.0239958141161045,
+      "mean_action_mag": 3.298360824584961
+    },
+    {
+      "episode_id": 13,
+      "seed": 13,
+      "success": false,
+      "return": 0.0,
+      "n_scores": 46,
+      "min_score": -8.028350830078125,
+      "mean_score": -5.707894693250242,
+      "mean_action_mag": 3.3564800024032593
+    },
+    {
+      "episode_id": 14,
+      "seed": 14,
+      "success": false,
+      "return": 0.0,
+      "n_scores": 46,
+      "min_score": -7.807825088500977,
+      "mean_score": -6.027273686035819,
+      "mean_action_mag": 3.3569895754689756
+    },
+    {
+      "episode_id": 15,
+      "seed": 15,
+      "success": false,
+      "return": 0.0,
+      "n_scores": 46,
+      "min_score": -7.872915744781494,
+      "mean_score": -5.936149229174075,
+      "mean_action_mag": 3.3540640499280845
+    },
+    {
+      "episode_id": 16,
+      "seed": 16,
+      "success": true,
+      "return": 8.0,
+      "n_scores": 46,
+      "min_score": -9.374735832214355,
+      "mean_score": -7.003595486931179,
+      "mean_action_mag": 3.303352687669837
+    },
+    {
+      "episode_id": 17,
+      "seed": 17,
+      "success": true,
+      "return": 1.0,
+      "n_scores": 46,
+      "min_score": -7.799673557281494,
+      "mean_score": -5.907521486282349,
+      "mean_action_mag": 3.354522337084231
+    },
+    {
+      "episode_id": 18,
+      "seed": 18,
+      "success": false,
+      "return": 0.0,
+      "n_scores": 46,
+      "min_score": -8.812091827392578,
+      "mean_score": -6.0335332518038545,
+      "mean_action_mag": 3.3564788103103638
+    },
+    {
+      "episode_id": 19,
+      "seed": 19,
+      "success": false,
+      "return": 0.0,
+      "n_scores": 46,
+      "min_score": -8.832479476928711,
+      "mean_score": -7.0308760767397676,
+      "mean_action_mag": 3.2989718551221103
+    },
+    {
+      "episode_id": 20,
+      "seed": 20,
+      "success": true,
+      "return": 11.0,
+      "n_scores": 46,
+      "min_score": -8.019946098327637,
+      "mean_score": -6.021706259768942,
+      "mean_action_mag": 3.3532543234203174
+    },
+    {
+      "episode_id": 21,
+      "seed": 21,
+      "success": false,
+      "return": 0.0,
+      "n_scores": 46,
+      "min_score": -9.345364570617676,
+      "mean_score": -7.2153867120328155,
+      "mean_action_mag": 3.3027790059214053
+    },
+    {
+      "episode_id": 22,
+      "seed": 22,
+      "success": false,
+      "return": 0.0,
+      "n_scores": 46,
+      "min_score": -8.549766540527344,
+      "mean_score": -5.717337053755055,
+      "mean_action_mag": 3.353900194168091
+    },
+    {
+      "episode_id": 23,
+      "seed": 23,
+      "success": false,
+      "return": 0.0,
+      "n_scores": 46,
+      "min_score": -8.835272789001465,
+      "mean_score": -5.641274032385453,
+      "mean_action_mag": 3.348800892415254
+    },
+    {
+      "episode_id": 24,
+      "seed": 24,
+      "success": true,
+      "return": 13.0,
+      "n_scores": 46,
+      "min_score": -7.5822906494140625,
+      "mean_score": -5.733614263327225,
+      "mean_action_mag": 3.356707065001778
+    },
+    {
+      "episode_id": 25,
+      "seed": 25,
+      "success": false,
+      "return": 0.0,
+      "n_scores": 46,
+      "min_score": -7.61472749710083,
+      "mean_score": -5.822866999584695,
+      "mean_action_mag": 3.355835152708966
+    },
+    {
+      "episode_id": 26,
+      "seed": 26,
+      "success": true,
+      "return": 7.0,
+      "n_scores": 46,
+      "min_score": -8.101859092712402,
+      "mean_score": -5.893073221911555,
+      "mean_action_mag": 3.356461120688397
+    },
+    {
+      "episode_id": 27,
+      "seed": 27,
+      "success": false,
+      "return": 0.0,
+      "n_scores": 46,
+      "min_score": -8.957256317138672,
+      "mean_score": -7.183649643607762,
+      "mean_action_mag": 3.302333899166273
+    },
+    {
+      "episode_id": 28,
+      "seed": 28,
+      "success": false,
+      "return": 0.0,
+      "n_scores": 46,
+      "min_score": -7.699317932128906,
+      "mean_score": -5.8754948273949,
+      "mean_action_mag": 3.355150855105856
+    },
+    {
+      "episode_id": 29,
+      "seed": 29,
+      "success": true,
+      "return": 2.0,
+      "n_scores": 46,
+      "min_score": -8.368766784667969,
+      "mean_score": -5.972355666367904,
+      "mean_action_mag": 3.354029277096624
+    },
+    {
+      "episode_id": 30,
+      "seed": 30,
+      "success": true,
+      "return": 7.0,
+      "n_scores": 46,
+      "min_score": -7.881093978881836,
+      "mean_score": -5.796167073042496,
+      "mean_action_mag": 3.354151435520338
+    },
+    {
+      "episode_id": 31,
+      "seed": 31,
+      "success": false,
+      "return": 0.0,
+      "n_scores": 46,
+      "min_score": -8.02193832397461,
+      "mean_score": -5.744948620381563,
+      "mean_action_mag": 3.352930618369061
+    },
+    {
+      "episode_id": 32,
+      "seed": 32,
+      "success": false,
+      "return": 0.0,
+      "n_scores": 46,
+      "min_score": -9.364429473876953,
+      "mean_score": -7.072249474732772,
+      "mean_action_mag": 3.3063405389371128
+    },
+    {
+      "episode_id": 33,
+      "seed": 33,
+      "success": false,
+      "return": 0.0,
+      "n_scores": 46,
+      "min_score": -9.372803688049316,
+      "mean_score": -7.096064702324245,
+      "mean_action_mag": 3.2995646570039834
+    },
+    {
+      "episode_id": 34,
+      "seed": 34,
+      "success": false,
+      "return": 0.0,
+      "n_scores": 46,
+      "min_score": -7.7766594886779785,
+      "mean_score": -5.875855933065,
+      "mean_action_mag": 3.3582253559775976
+    },
+    {
+      "episode_id": 35,
+      "seed": 35,
+      "success": true,
+      "return": 8.0,
+      "n_scores": 46,
+      "min_score": -7.286988258361816,
+      "mean_score": -5.775434447371441,
+      "mean_action_mag": 3.3499287988828574
+    },
+    {
+      "episode_id": 36,
+      "seed": 36,
+      "success": true,
+      "return": 11.0,
+      "n_scores": 46,
+      "min_score": -7.864412307739258,
+      "mean_score": -5.807927085005718,
+      "mean_action_mag": 3.3564553260803223
+    },
+    {
+      "episode_id": 37,
+      "seed": 37,
+      "success": false,
+      "return": 0.0,
+      "n_scores": 46,
+      "min_score": -8.779229164123535,
+      "mean_score": -7.1086294858352,
+      "mean_action_mag": 3.303662787313047
+    },
+    {
+      "episode_id": 38,
+      "seed": 38,
+      "success": false,
+      "return": 0.0,
+      "n_scores": 46,
+      "min_score": -7.749753475189209,
+      "mean_score": -5.789542006409687,
+      "mean_action_mag": 3.3592378108397773
+    },
+    {
+      "episode_id": 39,
+      "seed": 39,
+      "success": false,
+      "return": 0.0,
+      "n_scores": 46,
+      "min_score": -7.794447422027588,
+      "mean_score": -5.818912962208623,
+      "mean_action_mag": 3.356834572294484
+    },
+    {
+      "episode_id": 40,
+      "seed": 40,
+      "success": true,
+      "return": 6.0,
+      "n_scores": 46,
+      "min_score": -8.350224494934082,
+      "mean_score": -5.7490017621413525,
+      "mean_action_mag": 3.3533312652422036
+    },
+    {
+      "episode_id": 41,
+      "seed": 41,
+      "success": true,
+      "return": 3.0,
+      "n_scores": 46,
+      "min_score": -7.363156795501709,
+      "mean_score": -5.671220774235933,
+      "mean_action_mag": 3.3516121117965034
+    },
+    {
+      "episode_id": 42,
+      "seed": 42,
+      "success": false,
+      "return": 0.0,
+      "n_scores": 46,
+      "min_score": -7.999378681182861,
+      "mean_score": -6.001132508982783,
+      "mean_action_mag": 3.3548878638640693
+    },
+    {
+      "episode_id": 43,
+      "seed": 43,
+      "success": false,
+      "return": 0.0,
+      "n_scores": 46,
+      "min_score": -10.130102157592773,
+      "mean_score": -7.031599065531855,
+      "mean_action_mag": 3.294445815293685
+    },
+    {
+      "episode_id": 44,
+      "seed": 44,
+      "success": false,
+      "return": 0.0,
+      "n_scores": 46,
+      "min_score": -8.94446849822998,
+      "mean_score": -6.781817047492318,
+      "mean_action_mag": 3.2999646819156148
+    },
+    {
+      "episode_id": 45,
+      "seed": 45,
+      "success": false,
+      "return": 0.0,
+      "n_scores": 46,
+      "min_score": -8.918561935424805,
+      "mean_score": -6.948953048042629,
+      "mean_action_mag": 3.3025835493336553
+    },
+    {
+      "episode_id": 46,
+      "seed": 46,
+      "success": false,
+      "return": 0.0,
+      "n_scores": 46,
+      "min_score": -9.547903060913086,
+      "mean_score": -7.255943313888881,
+      "mean_action_mag": 3.303386952566064
+    },
+    {
+      "episode_id": 47,
+      "seed": 47,
+      "success": true,
+      "return": 3.0,
+      "n_scores": 46,
+      "min_score": -7.78908634185791,
+      "mean_score": -5.790274449016737,
+      "mean_action_mag": 3.3565235241599707
+    },
+    {
+      "episode_id": 48,
+      "seed": 48,
+      "success": false,
+      "return": 0.0,
+      "n_scores": 46,
+      "min_score": -9.448022842407227,
+      "mean_score": -7.215330745862878,
+      "mean_action_mag": 3.3014863573986553
+    },
+    {
+      "episode_id": 49,
+      "seed": 49,
+      "success": true,
+      "return": 16.0,
+      "n_scores": 46,
+      "min_score": -7.926921367645264,
+      "mean_score": -5.950662276019221,
+      "mean_action_mag": 3.3547432837278945
+    }
+  ]
+}

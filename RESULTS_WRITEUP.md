@@ -15,7 +15,7 @@ In visuomotor imitation learning, policies like Diffusion Policy can silently fa
 - Loss: InfoNCE — rank the correct action above M negatives
 - Inference score: log-margin = logit[correct] - logsumexp(logit[negatives])
 
-**Key files:** `tap/contrastive.py`, `tap/dataset.py`, `train_contrastive_tap.py`
+**Key files:** `tap/contrastive.py`, `train_contrastive_tap.py`
 
 **Hyperparameters:**
 | Parameter | Value |
@@ -30,7 +30,7 @@ In visuomotor imitation learning, policies like Diffusion Policy can silently fa
 
 ### 1.3 What We Tried First (and Failed): BCE Classification
 
-The original `train_tap.py` used binary cross-entropy to classify (obs, action) pairs as positive/negative. This **collapsed completely** — the model learned to output a constant score regardless of input, achieving ~50% accuracy on balanced data.
+The original approach used binary cross-entropy to classify (obs, action) pairs as positive/negative. This **collapsed completely** — the model learned to output a constant score regardless of input, achieving ~50% accuracy on balanced data.
 
 **Why it failed:** With binary labels, there's no incentive to use observations. Any constant prediction achieves baseline accuracy. The model has no reason to learn what expert behavior looks like.
 
@@ -48,12 +48,12 @@ Before integrating with Diffusion Policy, we validated TAP on synthetic action c
 
 | Metric | TAP-Score | Action Magnitude Baseline |
 |--------|-----------|---------------------------|
-| Held-out failure AUROC | **0.998** | 0.665 |
-| Prefix-only AUROC (first 70%) | **0.997** | — |
-| TPR @ 1% FPR | 94.3% | — |
+| Held-out failure AUROC | **0.994** | 0.636 |
+| Prefix-only AUROC (first 70%) | **1.000** | — |
+| TPR @ 1% FPR | 97.5% | — |
 | TPR @ 5% FPR | 100.0% | — |
 
-**M ablation (stability):** AUROC 0.990 (M=7), 1.000 (M=15), 0.993 (M=31) — stable.
+**M ablation (stability):** AUROC M=7 (1.000), M=15 (0.992), M=31 (0.995) — stable.
 
 **Caveat:** These numbers are on synthetic corruptions of expert data, not real policy rollouts. They show TAP learns the expert manifold, but don't prove it works on actual DP failures.
 
@@ -101,7 +101,7 @@ Using TAP H=8 in closed-loop DP rollouts (50 episodes per condition, paired seed
 
 **Idea:** Instead of just detecting bad actions, use TAP to actively improve the policy. At each step, sample K action chunks from DP, score each with TAP, execute the best one.
 
-**Implementation:** `eval_dp_reranking.py`
+**Implementation:** `archive/eval_dp_reranking.py`
 - Batched K sampling: repeat_interleave obs K times, run DP once, reshape to (B, K, H, Da)
 - Vectorized TAP scoring: score all K candidates per env in one forward pass
 - Margin gate: optionally require margin_delta gap before overriding candidate 0
@@ -140,7 +140,7 @@ On mild_blur, K=4 TAP performed *worse* than the K=4 no-TAP control. Zero true T
 
 **Fix:** Retrain TAP using actual DP proposals as hard negatives.
 
-**DP neg cache construction** (`scripts/build_dp_neg_cache_pusht.py`):
+**DP neg cache construction:**
 - For each expert (obs, action) sample, run DP K=8 times to get 8 candidate action chunks
 - Store as `dp_neg_cache.npz`: shape (N_samples, 8, 8, 2)
 - Also store aligned expert actions for distance computation
@@ -176,16 +176,65 @@ On mild_blur, K=4 TAP performed *worse* than the K=4 no-TAP control. Zero true T
 
 1. **Passive detection (strong):** TAP trained on expert demos can detect when DP is operating under perturbation (AUROC 0.81) and provides early warning of failures (median lead time: 17 policy steps). This works with the basic synthetic-negative-trained TAP.
 
-2. **Active reranking (promising but underpowered):** After retraining TAP with DP-proposal negatives, best-of-4 reranking shows +4pp causal improvement over the no-TAP control on prob_occlusion. Three confirmed rescue episodes. But n=50 is too small for statistical significance.
-
-**Unresolved at end of Phase 1:**
-- Need n=200 reranking eval for statistical power
-- Effect size is small (+4pp) — may wash out or strengthen at scale
-- Should try K=8 and margin gating to potentially amplify the effect
-- If reranking effect washes out, fall back to passive detection story only
+2. **Active reranking (negative result):** Best-of-K reranking shows limited effectiveness. Under degraded conditions where headroom appears, candidate distributions collapse — all K proposals become similarly bad, leaving little for a ranker to exploit.
 
 ---
 
-## Phase 2: [New Architecture]
+## Phase 2: Robomimic Detection
 
-*To be written.*
+### 2.1 Robomimic Porting
+
+Ported TAP-Score evaluation to robomimic Can and Lift tasks with lowdim (state-based) observations and Diffusion Policy checkpoints.
+
+**Key challenges solved:**
+- robosuite 1.5.2 compatibility: controller patches for absolute action mode, observation field reordering
+- DP action format: `undo_transform_action()` for rotation_6d → axis_angle conversion before TAP scoring
+- HDF5 dataset support for training TAP on robomimic demos
+
+### 2.2 Detection Results (Can)
+
+**Setting:** Can task, zero_object perturbation at onset=80, n=50 episodes
+
+| Metric | Value |
+|--------|-------|
+| Detection AUROC (min score) | **0.738** |
+| Detection AUROC (mean score) | 0.618 |
+| Magnitude baseline AUROC | 0.580 |
+| TAP advantage | +0.158 |
+| Bootstrap 95% CI | [0.578, 0.863] |
+| Abstention @ 20% coverage | 60% success (vs 40% baseline) |
+| Lead time (median) | 264 env steps |
+| Failures detected | 20/30 |
+
+**Key insight:** Min-score aggregation (worst TAP score across an episode) is a better discriminator than mean score, because a single off-manifold action chunk is diagnostic of impending failure.
+
+### 2.3 Detection Results (Lift)
+
+**Setting:** Lift task, zero_object perturbation at onset=31, n=50 episodes
+
+| Metric | Value |
+|--------|-------|
+| Detection AUROC (min score) | **0.657** |
+| Detection AUROC (mean score) | 0.666 |
+| Magnitude baseline AUROC | 0.545 |
+| TAP advantage | +0.112 |
+| Bootstrap 95% CI | [0.492, 0.799] |
+| Abstention @ 10% coverage | 100% success (vs 44% baseline) |
+| Abstention @ 20% coverage | 60% success (vs 44% baseline) |
+| Lead time (median) | 352 env steps |
+| Failures detected | 20/28 |
+
+**Lift onset curve:** Sharp transition — 30% success at onset=30, 55% at onset=31, 85% at onset=32. Onset=31 was chosen as the sweet spot for detection evaluation.
+
+**Cross-task comparison:** Can (AUROC 0.738) outperforms Lift (0.657), but both show consistent TAP advantage over action-magnitude baselines (+0.158 and +0.112 respectively). The pattern of min-score > mean-score for Can reverses slightly on Lift (mean 0.666 > min 0.657), possibly because Lift's shorter episodes make single-step outliers less diagnostic.
+
+### 2.4 Reranking Headroom (Negative Result)
+
+Counterfactual branching on Can with K=4:
+
+| Config | Clean Success | Degraded Success | Oracle Improvement |
+|--------|--------------|------------------|--------------------|
+| Single decision | 90% | 45% | +5% |
+| Multi decision | 90% | 45% | +5% |
+
+**Finding:** +5% oracle improvement across all configs, but candidate distributions collapse under zero_object — all candidates are similarly bad. Reranking cannot help when the proposal distribution itself has shifted off-manifold. This confirms detection/abstention is the right framing.
