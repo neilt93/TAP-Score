@@ -78,6 +78,6 @@ The approach has real limitations (it needs enough failure data, it's task-speci
 
 ---
 
-*Code and evaluation data: [github.com/neilt/TAP-Score](https://github.com/neilt/TAP-Score)*
+*Code and evaluation data: [github.com/neilt93/TAP-Score](https://github.com/neilt93/TAP-Score)*
 
-*Detection AUROC: Can 0.856 [0.779, 0.915], Lift 0.811 [0.718, 0.892]. n=100 episodes per task, bootstrap 95% CIs. Larger n=500 evaluations in progress.*
+*Detection AUROC: Can 0.856 [0.779, 0.915], Lift 0.811 [0.718, 0.892]. n=100 episodes per task, bootstrap 95% CIs.*

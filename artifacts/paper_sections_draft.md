@@ -100,27 +100,28 @@ delayed).*
 ### 3.2 Robomimic Can Under Occlusion
 
 Under zero_object onset=80 (the stress regime where Diffusion Policy succeeds
-~45% of the time), TAP-Score detects episode-level failure with AUROC 0.750
-using the minimum per-episode score as the detection statistic.
+45% of the time), the supervised risk TAP-Score detects episode-level failure
+with AUROC 0.856 using the mean per-episode risk score as the detection
+statistic.
 
 | Metric | Value | 95% CI |
 |--------|-------|--------|
-| Episodes | 50 (20 success, 30 fail) | --- |
-| AUROC (min score) | 0.750 | [0.604, 0.882] |
-| AUROC (mean score) | 0.593 | --- |
-| Lead time (median) | 264 env steps | [252, 292] |
-| Failed eps detected | 22/30 (73%) | --- |
+| Episodes | 100 (45 success, 55 fail) | --- |
+| AUROC (mean risk score) | 0.856 | [0.779, 0.915] |
+| AUPRC (mean risk score) | 0.881 | --- |
+| Success @ 20% coverage | 95% | [70%, 100%] |
+| Lead time (median) | 320 env steps | [320, 320] |
+| Failed eps detected | 55/55 (100%) | --- |
 
-The performance gap between Push-T (0.994) and Can (0.750) reflects the
-nature of the failure mechanism. In Push-T, held-out perturbations produce
-action chunks that are structurally incompatible with expert behavior
-(wrong scale, stuck, delayed). Under occlusion in Can, the policy still
-generates "action-plausible" predictions --- the actions have correct magnitude
-and timing but target the wrong spatial location because the object position is
-missing. TAP-Score partially detects this degradation through the observation
-encoder's sensitivity to the zeroed fields, but the action encoder cannot
-distinguish spatially-correct from spatially-incorrect manipulation actions
-without object context.
+The performance gap between the Push-T contrastive prototype (0.994) and the
+robomimic risk model (0.856 on Can, 0.811 on Lift) reflects the nature of the
+failure mechanism. In Push-T, held-out perturbations produce action chunks that
+are structurally incompatible with expert behavior (wrong scale, stuck,
+delayed). Under occlusion in robomimic, the policy still generates
+action-plausible predictions: the actions have correct magnitude and timing but
+target the wrong spatial location because the object position is missing. The
+final supervised risk model handles this by learning directly from real policy
+rollouts rather than relying only on expert-likeness.
 
 ### 3.3 Abstention Improves Reliability
 

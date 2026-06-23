@@ -193,40 +193,42 @@ Ported TAP-Score evaluation to robomimic Can and Lift tasks with lowdim (state-b
 
 ### 2.2 Detection Results (Can)
 
-**Setting:** Can task, zero_object perturbation at onset=80, n=50 episodes
+**Setting:** Can task, zero_object perturbation at onset=80, n=100 episodes
 
 | Metric | Value |
 |--------|-------|
-| Detection AUROC (min score) | **0.738** |
-| Detection AUROC (mean score) | 0.618 |
-| Magnitude baseline AUROC | 0.580 |
-| TAP advantage | +0.158 |
-| Bootstrap 95% CI | [0.578, 0.863] |
-| Abstention @ 20% coverage | 60% success (vs 40% baseline) |
-| Lead time (median) | 264 env steps |
-| Failures detected | 20/30 |
+| Detection AUROC (mean risk score) | **0.856** |
+| Detection AUROC (min score) | 0.793 |
+| AUPRC (mean risk score) | 0.881 |
+| Magnitude baseline AUROC | 0.537 |
+| TAP advantage | +0.320 |
+| Bootstrap 95% CI | [0.779, 0.915] |
+| Abstention @ 20% coverage | 95% success (vs 45% baseline) |
+| Lead time (median) | 320 env steps |
+| Failures detected | 55/55 |
 
-**Key insight:** Min-score aggregation (worst TAP score across an episode) is a better discriminator than mean score, because a single off-manifold action chunk is diagnostic of impending failure.
+**Key insight:** For the supervised risk model, mean episode risk is the strongest discriminator on Can. Unlike the earlier contrastive scorer, the risk model benefits from aggregating the sustained post-onset risk signal rather than looking only for a single worst action chunk.
 
 ### 2.3 Detection Results (Lift)
 
-**Setting:** Lift task, zero_object perturbation at onset=31, n=50 episodes
+**Setting:** Lift task, zero_object perturbation at onset=31, n=100 episodes
 
 | Metric | Value |
 |--------|-------|
-| Detection AUROC (min score) | **0.657** |
-| Detection AUROC (mean score) | 0.666 |
-| Magnitude baseline AUROC | 0.545 |
-| TAP advantage | +0.112 |
-| Bootstrap 95% CI | [0.492, 0.799] |
-| Abstention @ 10% coverage | 100% success (vs 44% baseline) |
-| Abstention @ 20% coverage | 60% success (vs 44% baseline) |
-| Lead time (median) | 352 env steps |
-| Failures detected | 20/28 |
+| Detection AUROC (mean risk score) | **0.811** |
+| Detection AUROC (min score) | 0.418 |
+| AUPRC (mean risk score) | 0.821 |
+| Magnitude baseline AUROC | 0.551 |
+| TAP advantage | +0.260 |
+| Bootstrap 95% CI | [0.718, 0.892] |
+| Abstention @ 10% coverage | 80% success (vs 47% baseline) |
+| Abstention @ 20% coverage | 90% success (vs 47% baseline) |
+| Lead time (median) | 360 env steps |
+| Failures detected | 53/53 |
 
 **Lift onset curve:** Sharp transition — 30% success at onset=30, 55% at onset=31, 85% at onset=32. Onset=31 was chosen as the sweet spot for detection evaluation.
 
-**Cross-task comparison:** Can (AUROC 0.738) outperforms Lift (0.657), but both show consistent TAP advantage over action-magnitude baselines (+0.158 and +0.112 respectively). The pattern of min-score > mean-score for Can reverses slightly on Lift (mean 0.666 > min 0.657), possibly because Lift's shorter episodes make single-step outliers less diagnostic.
+**Cross-task comparison:** Can (AUROC 0.856) outperforms Lift (0.811), and both show clear TAP advantage over action-magnitude baselines (+0.320 and +0.260 respectively). Mean aggregation is the right statistic for the final risk model on both tasks; min-score aggregation is mainly retained as a comparison point and for the Square negative result.
 
 ### 2.4 Reranking Headroom (Negative Result)
 

@@ -71,7 +71,7 @@ def bootstrap_ci(scores, successes, n_points=20, n_boot=1000, seed=42):
 
 def auc_selective(coverages, success_rates):
     """Area under the selective execution curve (trapezoidal)."""
-    return float(np.trapz(success_rates, coverages))
+    return float(np.trapezoid(success_rates, coverages))
 
 
 # ── Action magnitude direction ───────────────────────────────────────────
